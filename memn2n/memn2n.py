@@ -50,9 +50,17 @@ def add_gradient_noise(t, stddev=1e-3, name=None):
         gn = tf.random_normal(tf.shape(t), stddev=stddev)
         return tf.add(t, gn, name=name)
 
+
 class MemN2N(object):
     """End-To-End Memory Network."""
-    def __init__(self, batch_size, vocab_size, sentence_size, memory_size, embedding_size,
+    def __init__(
+        self,
+        batch_size,
+        vocab_size,
+        sentence_size,
+        memory_size,
+        embedding_size,
+        answer_vocab_size=None,
         hops=3,
         max_grad_norm=40.0,
         nonlin=None,
@@ -107,6 +115,9 @@ class MemN2N(object):
         self._init = initializer
         self._opt = optimizer
         self._name = name
+        self._answer_vocab_size = answer_vocab_size \
+            if answer_vocab_size \
+            else self._vocab_size
 
         self._build_inputs()
         self._build_vars()
@@ -148,11 +159,10 @@ class MemN2N(object):
         self._sess = session
         self._sess.run(init_op)
 
-
     def _build_inputs(self):
         self._stories = tf.placeholder(tf.int32, [None, self._memory_size, self._sentence_size], name="stories")
         self._queries = tf.placeholder(tf.int32, [None, self._sentence_size], name="queries")
-        self._answers = tf.placeholder(tf.int32, [None, self._vocab_size], name="answers")
+        self._answers = tf.placeholder(tf.int32, [None, self._answer_vocab_size], name="answers")
 
     def _build_vars(self):
         with tf.variable_scope(self._name):
@@ -165,7 +175,7 @@ class MemN2N(object):
             self.TA = tf.Variable(self._init([self._memory_size, self._embedding_size]), name='TA')
 
             self.H = tf.Variable(self._init([self._embedding_size, self._embedding_size]), name="H")
-            self.W = tf.Variable(self._init([self._embedding_size, self._vocab_size]), name="W")
+            self.W = tf.Variable(self._init([self._embedding_size, self._answer_vocab_size]), name="W")
         self._nil_vars = set([self.A.name, self.B.name])
 
     def _inference(self, stories, queries):

@@ -3,7 +3,11 @@ Download tasks from facebook.ai/babi """
 from __future__ import absolute_import
 from __future__ import print_function
 
-from dialog_data_utils import load_task, vectorize_data
+from dialog_data_utils import (
+    load_task,
+    vectorize_data_dialog,
+    get_candidates_list
+)
 from sklearn import cross_validation, metrics
 from memn2n import MemN2N
 from itertools import chain
@@ -32,15 +36,26 @@ print("Started Task:", FLAGS.task_id)
 train, test = load_task(FLAGS.data_dir, FLAGS.task_id)
 data = train + test
 
-vocab = sorted(reduce(lambda x, y: x | y, (set(list(chain.from_iterable(s)) + q + a) for s, q, a in data)))
+vocab = sorted(
+    reduce(
+        lambda x, y: x | y,
+        (set(list(chain.from_iterable(s)) + q + a) for s, q, a in data)
+    )
+)
+answer_candidates = get_candidates_list(FLAGS.data_dir)
 word_idx = dict((c, i + 1) for i, c in enumerate(vocab))
+answer_idx = dict(
+    (candidate, i + 1)
+    for i, candidate in enumerate(answer_candidates)
+)
 
 max_story_size = max(map(len, (s for s, _, _ in data)))
 mean_story_size = int(np.mean([ len(s) for s, _, _ in data ]))
 sentence_size = max(map(len, chain.from_iterable(s for s, _, _ in data)))
 query_size = max(map(len, (q for _, q, _ in data)))
 memory_size = min(FLAGS.memory_size, max_story_size)
-vocab_size = len(word_idx) + 1 # +1 for nil word
+vocab_size = len(word_idx) + 1  # +1 for nil word
+answer_vocab_size = len(answer_idx) + 1
 sentence_size = max(query_size, sentence_size) # for the position
 
 print("Longest sentence length", sentence_size)
@@ -48,9 +63,27 @@ print("Longest story length", max_story_size)
 print("Average story length", mean_story_size)
 
 # train/validation/test sets
-S, Q, A = vectorize_data(train, word_idx, sentence_size, memory_size)
-trainS, valS, trainQ, valQ, trainA, valA = cross_validation.train_test_split(S, Q, A, test_size=.1, random_state=FLAGS.random_state)
-testS, testQ, testA = vectorize_data(test, word_idx, sentence_size, memory_size)
+S, Q, A = vectorize_data_dialog(
+    train,
+    word_idx,
+    answer_idx,
+    sentence_size,
+    memory_size
+)
+trainS, valS, trainQ, valQ, trainA, valA = cross_validation.train_test_split(
+    S,
+    Q,
+    A,
+    test_size=.1,
+    random_state=FLAGS.random_state
+)
+testS, testQ, testA = vectorize_data_dialog(
+    test,
+    word_idx,
+    answer_idx,
+    sentence_size,
+    memory_size
+)
 
 print(testS[0])
 
@@ -77,8 +110,18 @@ batches = zip(range(0, n_train-batch_size, batch_size), range(batch_size, n_trai
 batches = [(start, end) for start, end in batches]
 
 with tf.Session() as sess:
-    model = MemN2N(batch_size, vocab_size, sentence_size, memory_size, FLAGS.embedding_size, session=sess,
-                   hops=FLAGS.hops, max_grad_norm=FLAGS.max_grad_norm, optimizer=optimizer)
+    model = MemN2N(
+        batch_size,
+        vocab_size,
+        sentence_size,
+        memory_size,
+        FLAGS.embedding_size,
+        answer_vocab_size=answer_vocab_size,
+        session=sess,
+        hops=FLAGS.hops,
+        max_grad_norm=FLAGS.max_grad_norm,
+        optimizer=optimizer
+    )
     for t in range(1, FLAGS.epochs+1):
         np.random.shuffle(batches)
         total_cost = 0.0

@@ -78,6 +78,7 @@ def get_stories(f, only_supporting=False):
     with open(f) as f:
         return parse_stories(f.readlines(), only_supporting=only_supporting)
 
+
 def vectorize_data(data, word_idx, sentence_size, memory_size):
     """
     Vectorize stories and queries.

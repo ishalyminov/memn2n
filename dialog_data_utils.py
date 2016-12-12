@@ -56,7 +56,13 @@ def parse_dialogs(lines, only_supporting=False):
     return data
 
 
-def vectorize_data(data, word_idx, sentence_size, memory_size):
+def get_candidates_list(data_dir):
+    candidates_file = os.path.join(data_dir, 'dialog-babi-candidates.txt')
+    with open(candidates_file) as candidates_in:
+        return [line.strip().split(' ', 1)[1] for line in candidates_in]
+
+
+def vectorize_data_dialog(data, word_idx, answer_idx, sentence_size, memory_size):
     """
     Vectorize stories and queries.
 
@@ -87,9 +93,8 @@ def vectorize_data(data, word_idx, sentence_size, memory_size):
         lq = max(0, sentence_size - len(query))
         q = [word_idx[w] for w in query] + [0] * lq
 
-        y = np.zeros(len(word_idx) + 1) # 0 is reserved for nil word
-        for a in answer:
-            y[word_idx[a]] = 1
+        y = np.zeros(len(answer_idx) + 1) # 0 is reserved for nil word
+        y[answer_idx[' '.join(answer).replace(' \' ', '\'')]] = 1
 
         S.append(ss)
         Q.append(q)
