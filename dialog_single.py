@@ -16,18 +16,34 @@ from six.moves import range, reduce
 import tensorflow as tf
 import numpy as np
 
-tf.flags.DEFINE_float("learning_rate", 0.01, "Learning rate for Adam Optimizer.")
+tf.flags.DEFINE_float(
+    "learning_rate",
+    0.01,
+    "Learning rate for Adam Optimizer."
+)
 tf.flags.DEFINE_float("epsilon", 1e-8, "Epsilon value for Adam Optimizer.")
 tf.flags.DEFINE_float("max_grad_norm", 40.0, "Clip gradients to this norm.")
-tf.flags.DEFINE_integer("evaluation_interval", 10, "Evaluate and print results every x epochs")
+tf.flags.DEFINE_integer(
+    "evaluation_interval",
+    10,
+    "Evaluate and print results every x epochs"
+)
 tf.flags.DEFINE_integer("batch_size", 32, "Batch size for training.")
 tf.flags.DEFINE_integer("hops", 3, "Number of hops in the Memory Network.")
 tf.flags.DEFINE_integer("epochs", 200, "Number of epochs to train for.")
-tf.flags.DEFINE_integer("embedding_size", 20, "Embedding size for embedding matrices.")
+tf.flags.DEFINE_integer(
+    "embedding_size",
+    20,
+    "Embedding size for embedding matrices."
+)
 tf.flags.DEFINE_integer("memory_size", 20, "Maximum size of memory.")
 tf.flags.DEFINE_integer("task_id", 1, "bAbI task id, 1 <= id <= 6")
 tf.flags.DEFINE_integer("random_state", None, "Random state.")
-tf.flags.DEFINE_string("data_dir", "../babi_tools/dialog-bAbI-tasks/", "Directory containing bAbI tasks")
+tf.flags.DEFINE_string(
+    "data_dir",
+    "../babi_tools/dialog-bAbI-tasks/",
+    "Directory containing bAbI tasks"
+)
 FLAGS = tf.flags.FLAGS
 
 print("Started Task:", FLAGS.task_id)
@@ -104,9 +120,15 @@ val_labels = np.argmax(valA, axis=1)
 
 tf.set_random_seed(FLAGS.random_state)
 batch_size = FLAGS.batch_size
-optimizer = tf.train.AdamOptimizer(learning_rate=FLAGS.learning_rate, epsilon=FLAGS.epsilon)
+optimizer = tf.train.AdamOptimizer(
+    learning_rate=FLAGS.learning_rate,
+    epsilon=FLAGS.epsilon
+)
 
-batches = zip(range(0, n_train-batch_size, batch_size), range(batch_size, n_train, batch_size))
+batches = zip(
+    range(0, n_train-batch_size, batch_size),
+    range(batch_size, n_train, batch_size)
+)
 batches = [(start, end) for start, end in batches]
 
 with tf.Session() as sess:
@@ -142,7 +164,10 @@ with tf.Session() as sess:
                 train_preds += list(pred)
 
             val_preds = model.predict(valS, valQ)
-            train_acc = metrics.accuracy_score(np.array(train_preds), train_labels)
+            train_acc = metrics.accuracy_score(
+                np.array(train_preds),
+                train_labels
+            )
             val_acc = metrics.accuracy_score(val_preds, val_labels)
 
             print('-----------------------')
