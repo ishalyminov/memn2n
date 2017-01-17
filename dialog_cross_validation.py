@@ -118,7 +118,7 @@ batches = zip(
 batches = [(start, end) for start, end in batches]
 
 
-def train_model(in_train_sqa, in_test_sqa):
+def train_model(in_model, in_train_sqa, in_test_sqa):
     for t in range(1, FLAGS.epochs+1):
         s_train, q_train, a_train = in_train_sqa
         s_test, q_test, a_test = in_test_sqa
@@ -128,7 +128,7 @@ def train_model(in_train_sqa, in_test_sqa):
             s = s_train[start:end]
             q = q_train[start:end]
             a = a_train[start:end]
-            cost_t = model.batch_fit(s, q, a)
+            cost_t = in_model.batch_fit(s, q, a)
             total_cost += cost_t
 
         if t % FLAGS.evaluation_interval == 0:
@@ -138,10 +138,10 @@ def train_model(in_train_sqa, in_test_sqa):
                 end = start + batch_size
                 s = s_train[start:end]
                 q = q_train[start:end]
-                pred = model.predict(s, q)
+                pred = in_model.predict(s, q)
                 train_preds += list(pred)
 
-            val_preds = model.predict(s_test, q_test)
+            val_preds = in_model.predict(s_test, q_test)
             train_acc = metrics.accuracy_score(
                 np.array(train_preds),
                 a_train
@@ -155,34 +155,32 @@ def train_model(in_train_sqa, in_test_sqa):
             print('Testing Accuracy:', val_acc)
             print('-----------------------')
 
+for train_indices, test_indices in CROSS_VALIDATION_SPLITTER.split(stories):
+    train_s = map(lambda x: stories[x], train_indices)
+    train_q = map(lambda x: questions[x], train_indices)
+    train_a = map(lambda x: answers[x], train_indices)
+    test_s = map(lambda x: stories[x], test_indices)
+    test_q = map(lambda x: questions[x], test_indices)
+    test_a = map(lambda x: answers[x], test_indices)
 
-with tf.Session() as sess:
-    model = MemN2N(
-        batch_size,
-        vocab_size,
-        sentence_size,
-        memory_size,
-        FLAGS.embedding_size,
-        answer_vocab_size=answer_vocab_size,
-        session=sess,
-        hops=FLAGS.hops,
-        max_grad_norm=FLAGS.max_grad_norm,
-        optimizer=optimizer
-    )
-
-    for train_indices, test_indices in CROSS_VALIDATION_SPLITTER.split(stories):
-        train_s = map(lambda x: stories[x], train_indices)
-        train_q = map(lambda x: questions[x], train_indices)
-        train_a = map(lambda x: answers[x], train_indices)
-        test_s = map(lambda x: stories[x], test_indices)
-        test_q = map(lambda x: questions[x], test_indices)
-        test_a = map(lambda x: answers[x], test_indices)
-
-        train_labels = np.argmax(train_a, axis=1)
-        test_labels = np.argmax(test_a, axis=1)
-        model.reset()
+    train_labels = np.argmax(train_a, axis=1)
+    test_labels = np.argmax(test_a, axis=1)
+    with tf.Session() as sess:
+        model = MemN2N(
+            batch_size,
+            vocab_size,
+            sentence_size,
+            memory_size,
+            FLAGS.embedding_size,
+            answer_vocab_size=answer_vocab_size,
+            session=sess,
+            hops=FLAGS.hops,
+            max_grad_norm=FLAGS.max_grad_norm,
+            optimizer=optimizer
+        )
         train_model(
             model,
             (train_s, train_q, train_a),
             (test_s, test_q, test_a)
         )
+

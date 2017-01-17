@@ -29,7 +29,7 @@ def zero_nil_slot(t, name=None):
     The nil_slot is a dummy slot and should not be trained and influence
     the training algorithm.
     """
-    with tf.op_scope([t], name, "zero_nil_slot") as name:
+    with tf.name_scope(name, "zero_nil_slot", [t]) as name:
         t = tf.convert_to_tensor(t, name="t")
         s = tf.shape(t)[1]
         z = tf.zeros(tf.pack([1, s]))
@@ -45,7 +45,7 @@ def add_gradient_noise(t, stddev=1e-3, name=None):
 
     0.001 was said to be a good fixed value for memory networks [2].
     """
-    with tf.op_scope([t, stddev], name, "add_gradient_noise") as name:
+    with tf.name_scope(name, "add_gradient_noise", [t, stddev]) as name:
         t = tf.convert_to_tensor(t, name="t")
         gn = tf.random_normal(tf.shape(t), stddev=stddev)
         return tf.add(t, gn, name=name)
@@ -155,7 +155,7 @@ class MemN2N(object):
         self.predict_log_proba_op = predict_log_proba_op
         self.train_op = train_op
 
-        init_op = tf.initialize_all_variables()
+        init_op = tf.global_variables_initializer()
         self._sess = session
         self._sess.run(init_op)
 
