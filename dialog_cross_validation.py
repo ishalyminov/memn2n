@@ -20,6 +20,7 @@ from dialog_data_utils import (
 from memn2n import MemN2N
 
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
+logger = logging.getLogger(__file__)
 
 tf.flags.DEFINE_float(
     "learning_rate",
@@ -122,38 +123,34 @@ def train_model(in_model, in_train_sqa, in_test_sqa):
     for t in range(1, FLAGS.epochs+1):
         s_train, q_train, a_train = in_train_sqa
         s_test, q_test, a_test = in_test_sqa
+        train_labels = np.argmax(a_train, axis=1)
+        test_labels = np.argmax(a_test, axis=1)
         np.random.shuffle(batches)
         total_cost = 0.0
         for start, end in batches:
             s = s_train[start:end]
             q = q_train[start:end]
             a = a_train[start:end]
+            # back-propagating each batch
             cost_t = in_model.batch_fit(s, q, a)
             total_cost += cost_t
 
         if t % FLAGS.evaluation_interval == 0:
-            train_preds = []
-            # evaluate on the whole train set
-            for start in range(0, TRAINSET_SIZE, batch_size):
-                end = start + batch_size
-                s = s_train[start:end]
-                q = q_train[start:end]
-                pred = in_model.predict(s, q)
-                train_preds += list(pred)
+            # evaluate on the whole trainset
+            train_preds = in_model.predict(s_train, q_train)
+            train_acc = metrics.accuracy_score(train_preds, train_labels)
 
-            val_preds = in_model.predict(s_test, q_test)
-            train_acc = metrics.accuracy_score(
-                np.array(train_preds),
-                a_train
-            )
-            val_acc = metrics.accuracy_score(val_preds, a_test)
+            # evaluating on the whole testset
+            test_preds = in_model.predict(s_test, q_test)
+            test_acc = metrics.accuracy_score(test_preds, test_labels)
 
-            print('-----------------------')
-            print('Epoch', t)
-            print('Total Cost:', total_cost)
-            print('Training Accuracy:', train_acc)
-            print('Testing Accuracy:', val_acc)
-            print('-----------------------')
+            logger.info('-----------------------')
+            logger.info('Epoch:\t{}'.format(t))
+            logger.info('Total Cost:\t{}'.format(total_cost))
+            logger.info('Training Accuracy:\t{}'.format(train_acc))
+            logger.info('Testing Accuracy:\t{}'.format(test_acc))
+            logger.info('-----------------------')
+
 
 for train_indices, test_indices in CROSS_VALIDATION_SPLITTER.split(stories):
     train_s = map(lambda x: stories[x], train_indices)
@@ -163,8 +160,6 @@ for train_indices, test_indices in CROSS_VALIDATION_SPLITTER.split(stories):
     test_q = map(lambda x: questions[x], test_indices)
     test_a = map(lambda x: answers[x], test_indices)
 
-    train_labels = np.argmax(train_a, axis=1)
-    test_labels = np.argmax(test_a, axis=1)
     with tf.Session() as sess:
         model = MemN2N(
             batch_size,
@@ -183,4 +178,3 @@ for train_indices, test_indices in CROSS_VALIDATION_SPLITTER.split(stories):
             (train_s, train_q, train_a),
             (test_s, test_q, test_a)
         )
-
