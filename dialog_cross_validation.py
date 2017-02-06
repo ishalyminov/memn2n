@@ -31,12 +31,12 @@ tf.flags.DEFINE_float("epsilon", 1e-8, "Epsilon value for Adam Optimizer.")
 tf.flags.DEFINE_float("max_grad_norm", 40.0, "Clip gradients to this norm.")
 tf.flags.DEFINE_integer(
     "evaluation_interval",
-    10,
+    1,
     "Evaluate and print results every x epochs"
 )
 tf.flags.DEFINE_integer("batch_size", 1, "Batch size for training.")
 tf.flags.DEFINE_integer("hops", 3, "Number of hops in the Memory Network.")
-tf.flags.DEFINE_integer("epochs", 200, "Number of epochs to train for.")
+tf.flags.DEFINE_integer("epochs", 100, "Number of epochs to train for.")
 tf.flags.DEFINE_integer(
     "embedding_size",
     20,
@@ -55,8 +55,8 @@ FLAGS = tf.flags.FLAGS
 print("Started Task:", FLAGS.task_id)
 
 # task data
-train, test = load_task(FLAGS.data_dir, FLAGS.task_id)
-data = train + test
+train, test, oov = load_task(FLAGS.data_dir, FLAGS.task_id)
+data = train + test + oov
 
 vocab = sorted(
     reduce(
@@ -121,6 +121,7 @@ batches = [(start, end) for start, end in batches]
 
 def train_model(in_model, in_train_sqa, in_test_sqa):
     for t in range(1, FLAGS.epochs+1):
+        best_test_accuracy = 0
         s_train, q_train, a_train = in_train_sqa
         s_test, q_test, a_test = in_test_sqa
         train_labels = np.argmax(a_train, axis=1)
@@ -150,7 +151,11 @@ def train_model(in_model, in_train_sqa, in_test_sqa):
             logger.info('Training Accuracy:\t{}'.format(train_acc))
             logger.info('Testing Accuracy:\t{}'.format(test_acc))
             logger.info('-----------------------')
+            best_test_accuracy = max(best_test_accuracy, test_acc)
+    return best_test_accuracy
 
+
+per_utterance_accuracies = []
 
 for train_indices, test_indices in CROSS_VALIDATION_SPLITTER.split(stories):
     train_s = map(lambda x: stories[x], train_indices)
@@ -173,8 +178,12 @@ for train_indices, test_indices in CROSS_VALIDATION_SPLITTER.split(stories):
             max_grad_norm=FLAGS.max_grad_norm,
             optimizer=optimizer
         )
-        train_model(
+        best_accuracy_per_epoch = train_model(
             model,
             (train_s, train_q, train_a),
             (test_s, test_q, test_a)
         )
+        per_utterance_accuracies.append(best_accuracy_per_epoch)
+
+print ('Got the following per-utterance accuracies for {} cross validation iterations:'.format(20))
+print ('Mean per-utterance accuracy:' + sum(per_utterance_accuracies) / float(20))
