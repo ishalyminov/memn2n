@@ -92,8 +92,8 @@ print("Average story length", mean_story_size)
 
 
 def train_model(in_model, in_train_sqa, in_test_sqa, in_batches):
+    best_train_accuracy, best_test_accuracy = 0.0, 0.0
     for t in range(1, FLAGS.epochs+1):
-        best_train_accuracy, best_test_accuracy = 0.0, 0.0
         s_train, q_train, a_train = in_train_sqa
         s_test, q_test, a_test = in_test_sqa
         train_labels = np.argmax(a_train, axis=1)
