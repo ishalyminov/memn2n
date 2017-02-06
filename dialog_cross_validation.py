@@ -3,12 +3,12 @@ Download tasks from facebook.ai/babi """
 from __future__ import absolute_import
 from __future__ import print_function
 
+import random
 from itertools import chain
 from six.moves import range, reduce
 import logging
 import sys
 
-from sklearn.model_selection import ShuffleSplit
 from sklearn import metrics
 import tensorflow as tf
 import numpy as np
@@ -53,11 +53,16 @@ tf.flags.DEFINE_string(
 )
 FLAGS = tf.flags.FLAGS
 
+random.seed(FLAGS.random_state)
+
+TRAINSET_SIZE = 2
+
 print("Started Task:", FLAGS.task_id)
 
 # task data
 train, test, oov = load_task(FLAGS.data_dir, FLAGS.task_id)
-data = train + test + oov
+all_dialogues = train + test + oov
+data = reduce(lambda x, y: x + y, all_dialogues, [])
 
 vocab = sorted(
     reduce(
@@ -85,51 +90,17 @@ print("Longest sentence length", sentence_size)
 print("Longest story length", max_story_size)
 print("Average story length", mean_story_size)
 
-# train/validation/test sets
-stories, questions, answers = vectorize_data_dialog(
-    data,
-    word_idx,
-    answer_idx,
-    sentence_size,
-    memory_size
-)
 
-TRAINSET_SIZE = 2
-TESTSET_SIZE = len(data) - 2
-CROSS_VALIDATION_SPLITTER = ShuffleSplit(
-    train_size=TRAINSET_SIZE,
-    test_size=TESTSET_SIZE,
-    random_state=FLAGS.random_state,
-    n_splits=20
-)
-
-print("Training Size", TRAINSET_SIZE)
-print("Testing Size", TESTSET_SIZE)
-
-tf.set_random_seed(FLAGS.random_state)
-batch_size = FLAGS.batch_size
-optimizer = tf.train.AdamOptimizer(
-    learning_rate=FLAGS.learning_rate,
-    epsilon=FLAGS.epsilon
-)
-
-batches = zip(
-    range(0, TRAINSET_SIZE - batch_size, batch_size),
-    range(batch_size, TRAINSET_SIZE, batch_size)
-)
-batches = [(start, end) for start, end in batches]
-
-
-def train_model(in_model, in_train_sqa, in_test_sqa):
+def train_model(in_model, in_train_sqa, in_test_sqa, in_batches):
     for t in range(1, FLAGS.epochs+1):
         best_train_accuracy, best_test_accuracy = 0.0, 0.0
         s_train, q_train, a_train = in_train_sqa
         s_test, q_test, a_test = in_test_sqa
         train_labels = np.argmax(a_train, axis=1)
         test_labels = np.argmax(a_test, axis=1)
-        np.random.shuffle(batches)
+        np.random.shuffle(in_batches)
         total_cost = 0.0
-        for start, end in batches:
+        for start, end in in_batches:
             s = s_train[start:end]
             q = q_train[start:end]
             a = a_train[start:end]
@@ -160,35 +131,73 @@ def train_model(in_model, in_train_sqa, in_test_sqa):
 
 
 def main(in_split_number):
-    for split_index, (train_indices, test_indices) in enumerate(CROSS_VALIDATION_SPLITTER.split(stories)):
-        if split_index != in_split_number:
-            continue
-        train_s = map(lambda x: stories[x], train_indices)
-        train_q = map(lambda x: questions[x], train_indices)
-        train_a = map(lambda x: answers[x], train_indices)
-        test_s = map(lambda x: stories[x], test_indices)
-        test_q = map(lambda x: questions[x], test_indices)
-        test_a = map(lambda x: answers[x], test_indices)
+    # train/validation/test sets
+    all_dialogues_idx = range(len(all_dialogues))
+    random.shuffle(all_dialogues_idx)
+    trainset_idx = all_dialogues_idx[
+        in_split_number * TRAINSET_SIZE:
+        in_split_number * TRAINSET_SIZE + TRAINSET_SIZE
+    ]
+    testset_idx = filter(lambda x: x not in trainset_idx, all_dialogues_idx)
+    dialogues_train = map(lambda x: all_dialogues[x], trainset_idx)
+    dialogues_test = map(lambda x: all_dialogues[x], testset_idx)
 
-        with tf.Session() as sess:
-            model = MemN2N(
-                batch_size,
-                vocab_size,
-                sentence_size,
-                memory_size,
-                FLAGS.embedding_size,
-                answer_vocab_size=answer_vocab_size,
-                session=sess,
-                hops=FLAGS.hops,
-                max_grad_norm=FLAGS.max_grad_norm,
-                optimizer=optimizer
-            )
-            best_accuracy_per_epoch = train_model(
-                model,
-                (train_s, train_q, train_a),
-                (test_s, test_q, test_a)
-            )
-        return best_accuracy_per_epoch
+    data_train = reduce(lambda x, y: x + y, dialogues_train, [])
+    data_test = reduce(lambda x, y: x + y, dialogues_test, [])
+
+    train_s, train_q, train_a = vectorize_data_dialog(
+        data_train,
+        word_idx,
+        answer_idx,
+        sentence_size,
+        memory_size
+    )
+    test_s, test_q, test_a = vectorize_data_dialog(
+        data_test,
+        word_idx,
+        answer_idx,
+        sentence_size,
+        memory_size
+    )
+
+    print("Training Size (dialogues)", len(dialogues_train))
+    print("Testing Size (dialogues)", len(dialogues_test))
+    print("Training Size (stories)", len(data_train))
+    print("Testing Size (stories)", len(data_test))
+
+    tf.set_random_seed(FLAGS.random_state)
+    batch_size = FLAGS.batch_size
+    optimizer = tf.train.AdamOptimizer(
+        learning_rate=FLAGS.learning_rate,
+        epsilon=FLAGS.epsilon
+    )
+
+    batches = zip(
+        range(0, TRAINSET_SIZE - batch_size, batch_size),
+        range(batch_size, TRAINSET_SIZE, batch_size)
+    )
+    batches = [(start, end) for start, end in batches]
+
+    with tf.Session() as sess:
+        model = MemN2N(
+            batch_size,
+            vocab_size,
+            sentence_size,
+            memory_size,
+            FLAGS.embedding_size,
+            answer_vocab_size=answer_vocab_size,
+            session=sess,
+            hops=FLAGS.hops,
+            max_grad_norm=FLAGS.max_grad_norm,
+            optimizer=optimizer
+        )
+        best_accuracy_per_epoch = train_model(
+            model,
+            (train_s, train_q, train_a),
+            (test_s, test_q, test_a),
+            batches
+        )
+    return best_accuracy_per_epoch
 
 
 if __name__ == '__main__':

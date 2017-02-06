@@ -45,6 +45,7 @@ def parse_dialogs(lines, only_supporting=False):
         nid = int(nid)
         if nid == 1:
             story = []
+            data.append([])
         question, answer = q_a.split('\t')
         question = question.rstrip('?')
         question = tokenize(question)
@@ -52,10 +53,10 @@ def parse_dialogs(lines, only_supporting=False):
 
         # Provide all the substories
         substory = filter(lambda x: x, story)
-        data.append((substory, question, answer))
+        data[-1].append((substory, question, answer))
         story.append(question)
         story.append(answer)
-    return data
+    return filter(lambda x: x, data)
 
 
 def get_candidates_list(data_dir):
