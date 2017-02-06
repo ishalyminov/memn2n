@@ -6,6 +6,7 @@ from __future__ import print_function
 from itertools import chain
 from six.moves import range, reduce
 import logging
+import sys
 
 from sklearn.model_selection import ShuffleSplit
 from sklearn import metrics
@@ -44,7 +45,7 @@ tf.flags.DEFINE_integer(
 )
 tf.flags.DEFINE_integer("memory_size", 20, "Maximum size of memory.")
 tf.flags.DEFINE_integer("task_id", 1, "bAbI task id, 1 <= id <= 6")
-tf.flags.DEFINE_integer("random_state", None, "Random state.")
+tf.flags.DEFINE_integer("random_state", 273, "Random state.")
 tf.flags.DEFINE_string(
     "data_dir",
     "../babi_tools/dialog-bAbI-tasks/",
@@ -155,35 +156,39 @@ def train_model(in_model, in_train_sqa, in_test_sqa):
     return best_test_accuracy
 
 
-per_utterance_accuracies = []
+def main(in_split_number):
+    for split_index, (train_indices, test_indices) in enumerate(CROSS_VALIDATION_SPLITTER.split(stories)):
+        if split_index != in_split_number:
+            continue
+        train_s = map(lambda x: stories[x], train_indices)
+        train_q = map(lambda x: questions[x], train_indices)
+        train_a = map(lambda x: answers[x], train_indices)
+        test_s = map(lambda x: stories[x], test_indices)
+        test_q = map(lambda x: questions[x], test_indices)
+        test_a = map(lambda x: answers[x], test_indices)
 
-for train_indices, test_indices in CROSS_VALIDATION_SPLITTER.split(stories):
-    train_s = map(lambda x: stories[x], train_indices)
-    train_q = map(lambda x: questions[x], train_indices)
-    train_a = map(lambda x: answers[x], train_indices)
-    test_s = map(lambda x: stories[x], test_indices)
-    test_q = map(lambda x: questions[x], test_indices)
-    test_a = map(lambda x: answers[x], test_indices)
+        with tf.Session() as sess:
+            model = MemN2N(
+                batch_size,
+                vocab_size,
+                sentence_size,
+                memory_size,
+                FLAGS.embedding_size,
+                answer_vocab_size=answer_vocab_size,
+                session=sess,
+                hops=FLAGS.hops,
+                max_grad_norm=FLAGS.max_grad_norm,
+                optimizer=optimizer
+            )
+            best_accuracy_per_epoch = train_model(
+                model,
+                (train_s, train_q, train_a),
+                (test_s, test_q, test_a)
+            )
+        return best_accuracy_per_epoch
 
-    with tf.Session() as sess:
-        model = MemN2N(
-            batch_size,
-            vocab_size,
-            sentence_size,
-            memory_size,
-            FLAGS.embedding_size,
-            answer_vocab_size=answer_vocab_size,
-            session=sess,
-            hops=FLAGS.hops,
-            max_grad_norm=FLAGS.max_grad_norm,
-            optimizer=optimizer
-        )
-        best_accuracy_per_epoch = train_model(
-            model,
-            (train_s, train_q, train_a),
-            (test_s, test_q, test_a)
-        )
-        per_utterance_accuracies.append(best_accuracy_per_epoch)
 
-print ('Got the following per-utterance accuracies for {} cross validation iterations:'.format(20))
-print ('Mean per-utterance accuracy:' + sum(per_utterance_accuracies) / float(20))
+if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        print ('Usage: dialog_cross_validation.py <split number>')
+    print ('{.3f}'.format(main(int(sys.argv[1]))))
