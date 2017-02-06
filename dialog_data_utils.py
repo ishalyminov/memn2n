@@ -24,12 +24,14 @@ def load_task(data_dir, task_id, only_supporting=False):
     files = [os.path.join(data_dir, f) for f in files]
     s = 'dialog-babi-task{}'.format(task_id)
     train_file = filter(lambda file: s in file and 'trn' in file, files)[0]
+    dev_file = filter(lambda file: s in file and 'dev' in file, files)[0]
     test_file = filter(lambda file: s in file and 'tst' in file, files)[0]
     oov_file = filter(lambda file: s in file and 'OOV' in file, files)[0]
     train_data = get_dialogs(train_file, only_supporting)
+    dev_data = get_dialogs(dev_file, only_supporting)
     test_data = get_dialogs(test_file, only_supporting)
     oov_data = get_dialogs(oov_file, only_supporting)
-    return train_data, test_data, oov_data
+    return train_data, dev_data, test_data, oov_data
 
 
 def parse_dialogs(lines, only_supporting=False):
@@ -39,8 +41,8 @@ def parse_dialogs(lines, only_supporting=False):
         line = line.lower().strip()
         if not line:
             continue
-        if 'api_call' in line:
-            continue
+        #if 'api_call' in line:
+        #    continue
         nid, q_a = line.split(' ', 1)
         nid = int(nid)
         if nid == 1:

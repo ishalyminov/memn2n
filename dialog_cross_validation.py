@@ -60,8 +60,8 @@ TRAINSET_SIZE = 2
 print("Started Task:", FLAGS.task_id)
 
 # task data
-train, test, oov = load_task(FLAGS.data_dir, FLAGS.task_id)
-all_dialogues = train + test + oov
+train, dev, test, oov = load_task(FLAGS.data_dir, FLAGS.task_id)
+all_dialogues = train + dev + test + oov
 data = reduce(lambda x, y: x + y, all_dialogues, [])
 
 vocab = sorted(
@@ -132,7 +132,7 @@ def train_model(in_model, in_train_sqa, in_test_sqa, in_batches):
 
 def main(in_split_number):
     # train/validation/test sets
-    all_dialogues_idx = range(len(all_dialogues))
+    all_dialogues_idx = reduce(lambda x, y: x + [y], range(len(all_dialogues)), []) 
     random.shuffle(all_dialogues_idx)
     trainset_idx = all_dialogues_idx[
         in_split_number * TRAINSET_SIZE:
@@ -173,8 +173,8 @@ def main(in_split_number):
     )
 
     batches = zip(
-        range(0, TRAINSET_SIZE - batch_size, batch_size),
-        range(batch_size, TRAINSET_SIZE, batch_size)
+        range(0, len(data_train) - batch_size, batch_size),
+        range(batch_size, len(data_train), batch_size)
     )
     batches = [(start, end) for start, end in batches]
 
