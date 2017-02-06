@@ -122,7 +122,7 @@ batches = [(start, end) for start, end in batches]
 
 def train_model(in_model, in_train_sqa, in_test_sqa):
     for t in range(1, FLAGS.epochs+1):
-        best_test_accuracy = 0
+        best_train_accuracy, best_test_accuracy = 0.0, 0.0
         s_train, q_train, a_train = in_train_sqa
         s_test, q_test, a_test = in_test_sqa
         train_labels = np.argmax(a_train, axis=1)
@@ -152,8 +152,11 @@ def train_model(in_model, in_train_sqa, in_test_sqa):
             logger.info('Training Accuracy:\t{}'.format(train_acc))
             logger.info('Testing Accuracy:\t{}'.format(test_acc))
             logger.info('-----------------------')
-            best_test_accuracy = max(best_test_accuracy, test_acc)
-    return best_test_accuracy
+            best_train_accuracy, best_test_accuracy = max(
+                (best_train_accuracy, best_test_accuracy),
+                (train_acc, test_acc)
+            )
+    return best_train_accuracy, best_test_accuracy
 
 
 def main(in_split_number):
@@ -191,4 +194,5 @@ def main(in_split_number):
 if __name__ == '__main__':
     if len(sys.argv) != 2:
         print ('Usage: dialog_cross_validation.py <split number>')
-    print ('{.3f}'.format(main(int(sys.argv[1]))))
+    accuracies = main(int(sys.argv[1]))
+    print ('train: {0:.3f}, test: {1:.3f}'.format(*accuracies))
