@@ -55,8 +55,6 @@ FLAGS = tf.flags.FLAGS
 
 random.seed(FLAGS.random_state)
 
-TRAINSET_SIZE = 2
-
 print("Started Task:", FLAGS.task_id)
 
 # task data
@@ -130,13 +128,13 @@ def train_model(in_model, in_train_sqa, in_test_sqa, in_batches):
     return best_train_accuracy, best_test_accuracy
 
 
-def main(in_split_number):
+def main(in_trainset_size, in_split_number):
     # train/validation/test sets
     all_dialogues_idx = reduce(lambda x, y: x + [y], range(len(all_dialogues)), []) 
     random.shuffle(all_dialogues_idx)
     trainset_idx = all_dialogues_idx[
-        in_split_number * TRAINSET_SIZE:
-        in_split_number * TRAINSET_SIZE + TRAINSET_SIZE
+        in_split_number * in_trainset_size:
+        in_split_number * in_trainset_size + in_trainset_size
     ]
     testset_idx = filter(lambda x: x not in trainset_idx, all_dialogues_idx)
     dialogues_train = map(lambda x: all_dialogues[x], trainset_idx)
@@ -201,7 +199,11 @@ def main(in_split_number):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print ('Usage: dialog_cross_validation.py <split number>')
-    accuracies = main(int(sys.argv[1]))
+    if len(sys.argv) != 3:
+        print (
+            'Usage: dialog_cross_validation.py '
+            '<#training dialogues> <split number>'
+        )
+    trainset_size, split_number = map(int, sys.argv[1:3])
+    accuracies = main(trainset_size, split_number)
     print ('train: {0:.3f}, test: {1:.3f}'.format(*accuracies))
