@@ -131,7 +131,7 @@ def train_model(in_model, in_train_sqa, in_test_sqa, in_batches):
 def get_global_dialogue_index(in_dialogue_filename):
     dialogue_index = int(in_dialogue_filename.split('.')[-1])
     dialogue_dataset = in_dialogue_filename[len('dialog-babi-task1-API-calls-'):].partition('.')[0]
-    result = dialogue_index - 1
+    result = dialogue_index
     if dialogue_dataset == 'trn':
         return result
     else:
