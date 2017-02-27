@@ -4,10 +4,10 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 import random
+import sys
 from itertools import chain
 from six.moves import range, reduce
 import logging
-import sys
 
 from sklearn import metrics
 import tensorflow as tf
@@ -128,12 +128,39 @@ def train_model(in_model, in_train_sqa, in_test_sqa, in_batches):
     return best_train_accuracy, best_test_accuracy
 
 
-def main():
-    # train/validation/test sets
-    all_dialogues_idx = reduce(lambda x, y: x + [y], range(len(all_dialogues)), [])
-    random.shuffle(all_dialogues_idx)
-    trainset_idx = [len(train) + 1000]  # dialog-babi-task1-API-calls-dev.txt.1000
-    testset_idx = filter(lambda x: x not in trainset_idx, all_dialogues_idx)[:100]
+def get_global_dialogue_index(in_dialogue_filename):
+    dialogue_index = int(in_dialogue_filename.split('.')[-1])
+    dialogue_dataset = in_dialogue_filename[len('dialog-babi-task1-API-calls-'):].partition('.')[0]
+    result = dialogue_index - 1
+    if dialogue_dataset == 'trn':
+        return result
+    else:
+        result += len(train)
+    if dialogue_dataset == 'dev':
+        return result
+    else:
+        result += len(dev)
+    if dialogue_dataset == 'tst':
+        return result
+    else:
+        result += len(test)
+    return result
+
+
+def main(
+    in_train_dialogue_name,
+    in_testset_size,
+    in_fold_number,
+    in_dataset_shuffle
+):
+    trainset_idx = [get_global_dialogue_index(in_train_dialogue_name)]
+    testset_idx = []
+    testset_counter = in_fold_number * in_testset_size
+    while len(testset_idx) != in_testset_size:
+        current_idx = in_dataset_shuffle[testset_counter]
+        if current_idx not in trainset_idx:
+            testset_idx.append(current_idx)
+        testset_counter += 1
     dialogues_train = map(lambda x: all_dialogues[x], trainset_idx)
     dialogues_test = map(lambda x: all_dialogues[x], testset_idx)
 
@@ -196,5 +223,20 @@ def main():
 
 
 if __name__ == '__main__':
-    accuracies = main()
+    if len(sys.argv) != 5:
+        print('Usage: {} <train dialogue name> <testset size> <#fold> <dataset shuffle>')
+        exit()
+    train_dialogue_filename, dataset_shuffle_filename = sys.argv[1], sys.argv[4]
+    testset_size, fold_number = int(sys.argv[2:4])
+    with open(dataset_shuffle_filename) as dataset_shuffle_in:
+        dataset_shuffle = map(
+            int,
+            dataset_shuffle_in.readline().strip().split(';')
+        )
+    accuracies = main(
+        train_dialogue_filename,
+        testset_size,
+        fold_number,
+        dataset_shuffle
+    )
     print ('train: {0:.3f}, test: {1:.3f}'.format(*accuracies))
