@@ -5,12 +5,12 @@ import numpy as np
 from data_utils import tokenize
 
 
-def get_dialogs(f, only_supporting=False):
+def get_dialogs(f, ignore_api_calls):
     '''Given a file name, read the file, retrieve the stories, and then convert the sentences into a single story.
     If max_length is supplied, any stories longer than max_length tokens will be discarded.
     '''
     with open(f) as f:
-        return parse_dialogs(f.readlines(), only_supporting=only_supporting)
+        return parse_dialogs(f.readlines(), ignore_api_calls=ignore_api_calls)
 
 
 def load_task(data_dir, task_id, only_supporting=False):
@@ -27,22 +27,22 @@ def load_task(data_dir, task_id, only_supporting=False):
     dev_file = filter(lambda file: s in file and 'dev' in file, files)[0]
     test_file = filter(lambda file: s in file and 'tst' in file, files)[0]
     oov_file = filter(lambda file: s in file and 'OOV' in file, files)[0]
-    train_data = get_dialogs(train_file, only_supporting)
-    dev_data = get_dialogs(dev_file, only_supporting)
-    test_data = get_dialogs(test_file, only_supporting)
-    oov_data = get_dialogs(oov_file, only_supporting)
+    train_data = get_dialogs(train_file, True)
+    dev_data = get_dialogs(dev_file, True)
+    test_data = get_dialogs(test_file, True)
+    oov_data = get_dialogs(oov_file, True)
     return train_data, dev_data, test_data, oov_data
 
 
-def parse_dialogs(lines, only_supporting=False):
+def parse_dialogs(lines, ignore_api_calls=False):
     data = []
     story = []
     for line in lines:
         line = line.lower().strip()
         if not line:
             continue
-        #if 'api_call' in line:
-        #    continue
+        if 'api_call' in line and ignore_api_calls:
+            continue
         nid, q_a = line.split(' ', 1)
         nid = int(nid)
         if nid == 1:
