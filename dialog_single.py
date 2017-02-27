@@ -5,6 +5,7 @@ from __future__ import print_function
 
 import random
 import sys
+import os
 from itertools import chain
 from six.moves import range, reduce
 import logging
@@ -224,10 +225,10 @@ def main(
 
 if __name__ == '__main__':
     if len(sys.argv) != 5:
-        print('Usage: {} <train dialogue name> <testset size> <#fold> <dataset shuffle>')
+        print('Usage: {} <train dialogue name> <testset size> <#fold> <dataset shuffle>'.format(os.path.basename(__file__)))
         exit()
     train_dialogue_filename, dataset_shuffle_filename = sys.argv[1], sys.argv[4]
-    testset_size, fold_number = int(sys.argv[2:4])
+    testset_size, fold_number = map(int, sys.argv[2:4])
     with open(dataset_shuffle_filename) as dataset_shuffle_in:
         dataset_shuffle = map(
             int,
