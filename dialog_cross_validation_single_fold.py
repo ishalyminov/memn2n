@@ -49,7 +49,7 @@ tf.flags.DEFINE_integer("task_id", 1, "bAbI task id, 1 <= id <= 6")
 tf.flags.DEFINE_integer("random_state", 273, "Random state.")
 tf.flags.DEFINE_string(
     "data_dir",
-    "../babi_tools/babi_plus_generalization_experiment",
+    "../babi_tools/dialog-bAbI-tasks/",
     "Directory containing bAbI tasks"
 )
 FLAGS = tf.flags.FLAGS
@@ -148,9 +148,25 @@ def get_global_dialogue_index(in_dialogue_filename):
     return result
 
 
-def main():
-    data_train = reduce(lambda x, y: x + y, train, [])
-    data_test = reduce(lambda x, y: x + y, test, [])
+def main(
+    in_train_dialogue_name,
+    in_testset_size,
+    in_fold_number,
+    in_dataset_shuffle
+):
+    trainset_idx = [get_global_dialogue_index(in_train_dialogue_name)]
+    testset_idx = []
+    testset_counter = in_fold_number * in_testset_size
+    while len(testset_idx) != in_testset_size:
+        current_idx = in_dataset_shuffle[testset_counter]
+        if current_idx not in trainset_idx:
+            testset_idx.append(current_idx)
+        testset_counter += 1
+    dialogues_train = map(lambda x: all_dialogues[x], trainset_idx)
+    dialogues_test = map(lambda x: all_dialogues[x], testset_idx)
+
+    data_train = reduce(lambda x, y: x + y, dialogues_train, [])
+    data_test = reduce(lambda x, y: x + y, dialogues_test, [])
 
     train_s, train_q, train_a = vectorize_data_dialog(
         data_train,
@@ -167,8 +183,8 @@ def main():
         memory_size
     )
 
-    print("Training Size (dialogues)", len(train))
-    print("Testing Size (dialogues)", len(test))
+    print("Training Size (dialogues)", len(dialogues_train))
+    print("Testing Size (dialogues)", len(dialogues_test))
     print("Training Size (stories)", len(data_train))
     print("Testing Size (stories)", len(data_test))
 
@@ -208,5 +224,20 @@ def main():
 
 
 if __name__ == '__main__':
-    accuracies = main()
+    if len(sys.argv) != 5:
+        print('Usage: {} <train dialogue name> <testset size> <#fold> <dataset shuffle>'.format(os.path.basename(__file__)))
+        exit()
+    train_dialogue_filename, dataset_shuffle_filename = sys.argv[1], sys.argv[4]
+    testset_size, fold_number = map(int, sys.argv[2:4])
+    with open(dataset_shuffle_filename) as dataset_shuffle_in:
+        dataset_shuffle = map(
+            int,
+            dataset_shuffle_in.readline().strip().split(';')
+        )
+    accuracies = main(
+        train_dialogue_filename,
+        testset_size,
+        fold_number,
+        dataset_shuffle
+    )
     print ('train: {0:.3f}, test: {1:.3f}'.format(*accuracies))
