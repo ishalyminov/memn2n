@@ -17,6 +17,7 @@ def parse_dialogs_ds(lines, ignore_api_calls=False):
             data.append([])
         question, answer = q_a.split('\t')
         question = map(int, question.strip('[]').split(', '))
+        answer = map(int, answer.strip('[]').split(', '))
 
         # Provide all the substories
         substory = filter(lambda x: x, story)
@@ -77,11 +78,12 @@ def vectorize_data_dialog_ds(
     S = []
     Q = []
     A = []
+    # sentences are already encoded into DS features vectors of a fixed size
+    question_sentence_size = len(data_ds[0][1])
     for (story_raw, query_raw, answer_raw), (story, query, answer) in zip(data_raw, data_ds):
         # sentence is already DS-encoded and of a constant size
-        sentence_size = len(story[0])
         ss = []
-        for i, sentence in enumerate(story, 1):
+        for sentence in story:
             ss.append(sentence)
 
         # take only the most recent sentences that fit in memory
@@ -90,9 +92,7 @@ def vectorize_data_dialog_ds(
         # pad to memory_size
         lm = max(0, memory_size - len(ss))
         for _ in range(lm):
-            ss.append([0] * sentence_size)
-
-        lq = max(0, sentence_size - len(query))
+            ss.append([0] * question_sentence_size)
 
         y = np.zeros(len(answer_idx) + 1) # 0 is reserved for nil word
         y[answer_idx[' '.join(answer_raw).replace(' \' ', '\'')]] = 1
@@ -100,4 +100,8 @@ def vectorize_data_dialog_ds(
         S.append(ss)
         Q.append(query)
         A.append(y)
-    return np.array(S), np.array(Q), np.array(A)
+    return (
+        np.array(S),
+        np.array(Q),
+        np.array(A)
+    )

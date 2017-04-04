@@ -3,6 +3,7 @@ Download tasks from facebook.ai/babi """
 from __future__ import absolute_import
 from __future__ import print_function
 
+import sys
 import json
 import random
 from optparse import OptionParser
@@ -28,14 +29,14 @@ with open(CONFIG_PATH) as config_in:
 random.seed(CONFIG['random_state'])
 
 
-def load_data(in_data_root, in_task_id):
+def load_data(in_raw_root, in_ds_root, in_task_id):
     # task data
-    train, dev, test, oov = load_task_ds(in_data_root, in_task_id)
-    train_raw, dev_raw, test_raw, oov_raw = load_task(in_data_root, in_task_id)
+    train, dev, test, oov = load_task_ds(in_ds_root, in_task_id)
+    train_raw, dev_raw, test_raw, oov_raw = load_task(in_raw_root, in_task_id)
     all_dialogues = train + dev + test + oov
     data = reduce(lambda x, y: x + y, all_dialogues, [])
 
-    answer_candidates = get_candidates_list(in_data_root)
+    answer_candidates = get_candidates_list(in_raw_root)
     answer_idx = dict(
         (candidate, i + 1)
         for i, candidate in enumerate(answer_candidates)
@@ -100,20 +101,17 @@ def configure_option_parser():
 
 def main(in_data_root):
     print("Started Task:", CONFIG['task_id'])
-    data_json = load_data(in_data_root, CONFIG['task_id'])
+    data_json = load_data(in_data_root, CONFIG['ds_dir'], CONFIG['task_id'])
 
     # both DS and raw text features used
     train, dev, test, oov = data_json['ds']
     data_train = reduce(lambda x, y: x + y, train, [])
     data_test = reduce(lambda x, y: x + y, test, [])
     train_raw, dev_raw, test_raw, oov_raw = data_json['raw']
-    data_train_raw = reduce(lambda x, y: x + y, train, [])
-    data_test_raw = reduce(lambda x, y: x + y, test, [])
+    data_train_raw = reduce(lambda x, y: x + y, train_raw, [])
+    data_test_raw = reduce(lambda x, y: x + y, test_raw, [])
 
     answer_idx = data_json['answer_idx']
-
-    data_train = reduce(lambda x, y: x + y, train, [])
-    data_test = reduce(lambda x, y: x + y, test, [])
 
     train_s, train_q, train_a = vectorize_data_dialog_ds(
         data_train_raw,
@@ -146,14 +144,18 @@ def main(in_data_root):
     )
     batches = [(start, end) for start, end in batches]
 
+    # getting the length of the first question in our dataset -
+    # along with answers, they're encoded in a fixed-size DS TTRMDP state
+    sentence_size = len(data_train[0][1])
+    answer_vocab_size = train_a.shape[1]
     with tf.Session() as sess:
         model = MemN2N(
             CONFIG['batch_size'],
             2,
-            len(data_train[0]),
-            CONFIG['batch_size'],
+            sentence_size,
+            CONFIG['memory_size'],
             CONFIG['embedding_size'],
-            answer_vocab_size=2,
+            answer_vocab_size=answer_vocab_size,
             session=sess,
             hops=CONFIG['hops'],
             max_grad_norm=CONFIG['max_grad_norm'],
@@ -169,5 +171,6 @@ def main(in_data_root):
 
 
 if __name__ == '__main__':
-    accuracies = main()
+    src_root = sys.argv[1] if 1 < len(sys.argv) else CONFIG['data_dir']
+    accuracies = main(src_root)
     print ('train: {0:.3f}, test: {1:.3f}'.format(*accuracies))
