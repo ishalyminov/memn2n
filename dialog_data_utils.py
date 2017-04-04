@@ -13,7 +13,7 @@ def get_dialogs(f, ignore_api_calls):
         return parse_dialogs(f.readlines(), ignore_api_calls=ignore_api_calls)
 
 
-def load_task(data_dir, task_id, only_supporting=False):
+def load_task(data_dir, task_id):
     '''Load the nth task. There are 6 tasks in total.
 
     Returns a tuple containing the training and testing data for the task.
@@ -41,8 +41,8 @@ def parse_dialogs(lines, ignore_api_calls=False):
         line = line.lower().strip()
         if not line:
             continue
-        if 'api_call' in line and ignore_api_calls:
-            continue
+        # if 'api_call' in line and ignore_api_calls:
+        #     continue
         nid, q_a = line.split(' ', 1)
         nid = int(nid)
         if nid == 1:
