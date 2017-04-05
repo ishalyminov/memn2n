@@ -1,11 +1,13 @@
 """Example running MemN2N on a single bAbI task.
 Download tasks from facebook.ai/babi """
+
 from __future__ import absolute_import
 from __future__ import print_function
 
 import sys
 import json
 import random
+from operator import itemgetter
 from optparse import OptionParser
 
 from six.moves import range, reduce
@@ -111,17 +113,25 @@ def main(in_data_root):
     data_train_raw = reduce(lambda x, y: x + y, train_raw, [])
     data_test_raw = reduce(lambda x, y: x + y, test_raw, [])
 
+    data_all = data_train + data_test
+    question_vocabulary_size = len(data_all[0][1]) + 1
+    max_question_sentence_size = max(map(sum, map(itemgetter(1), data_all)))
+
     answer_idx = data_json['answer_idx']
 
     train_s, train_q, train_a = vectorize_data_dialog_ds(
         data_train_raw,
         data_train,
+        question_vocabulary_size,
+        max_question_sentence_size,
         answer_idx,
         CONFIG['memory_size']
     )
     test_s, test_q, test_a = vectorize_data_dialog_ds(
         data_test_raw,
         data_test,
+        question_vocabulary_size,
+        max_question_sentence_size,
         answer_idx,
         CONFIG['memory_size']
     )
@@ -144,15 +154,12 @@ def main(in_data_root):
     )
     batches = [(start, end) for start, end in batches]
 
-    # getting the length of the first question in our dataset -
-    # along with answers, they're encoded in a fixed-size DS TTRMDP state
-    sentence_size = len(data_train[0][1])
     answer_vocab_size = train_a.shape[1]
     with tf.Session() as sess:
         model = MemN2N(
             CONFIG['batch_size'],
-            2,
-            sentence_size,
+            question_vocabulary_size,
+            max_question_sentence_size,
             CONFIG['memory_size'],
             CONFIG['embedding_size'],
             answer_vocab_size=answer_vocab_size,

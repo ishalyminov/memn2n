@@ -59,9 +59,19 @@ def load_task_ds(data_dir, task_id):
     return train_data, dev_data, test_data, oov_data
 
 
+def ttr_mdp_to_one_hot(in_sentence):
+    one_hot_result = []
+    for bit_index, bit in enumerate(in_sentence):
+        if bit == 1:
+            one_hot_result.append(bit_index)
+    return one_hot_result
+
+
 def vectorize_data_dialog_ds(
     data_raw,
     data_ds,
+    question_vocabulary_size,
+    max_question_sentence_size,
     answer_idx,
     memory_size
 ):
@@ -78,13 +88,14 @@ def vectorize_data_dialog_ds(
     S = []
     Q = []
     A = []
-    # sentences are already encoded into DS features vectors of a fixed size
-    question_sentence_size = len(data_ds[0][1])
+
     for (story_raw, query_raw, answer_raw), (story, query, answer) in zip(data_raw, data_ds):
         # sentence is already DS-encoded and of a constant size
         ss = []
         for sentence in story:
-            ss.append(sentence)
+            one_hot_sentence = ttr_mdp_to_one_hot(sentence)
+            ls = max(0, max_question_sentence_size - len(one_hot_sentence))
+            ss.append(one_hot_sentence + [question_vocabulary_size - 1] * ls)
 
         # take only the most recent sentences that fit in memory
         ss = ss[::-1][:memory_size][::-1]
@@ -92,16 +103,16 @@ def vectorize_data_dialog_ds(
         # pad to memory_size
         lm = max(0, memory_size - len(ss))
         for _ in range(lm):
-            ss.append([0] * question_sentence_size)
+            ss.append([0] * max_question_sentence_size)
+
+        one_hot_query = ttr_mdp_to_one_hot(query)
+        lq = max(0, max_question_sentence_size - len(one_hot_query))
+        q = one_hot_query + [question_vocabulary_size - 1] * lq
 
         y = np.zeros(len(answer_idx) + 1) # 0 is reserved for nil word
         y[answer_idx[' '.join(answer_raw).replace(' \' ', '\'')]] = 1
 
         S.append(ss)
-        Q.append(query)
+        Q.append(q)
         A.append(y)
-    return (
-        np.array(S),
-        np.array(Q),
-        np.array(A)
-    )
+    return np.array(S), np.array(Q), np.array(A)
