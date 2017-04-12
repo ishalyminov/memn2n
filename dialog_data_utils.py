@@ -34,6 +34,26 @@ def load_task(data_dir, task_id, only_supporting=False):
     return train_data, dev_data, test_data, oov_data
 
 
+def load_task_for_cv(data_dir, task_id):
+    '''Load the nth task. There are 6 tasks in total.
+
+    Returns a tuple containing the training and testing data for the task.
+    '''
+    assert 0 < task_id < 7
+
+    files = os.listdir(data_dir)
+    files = [os.path.join(data_dir, f) for f in files]
+    s = 'dialog-babi-task{}'.format(task_id)
+    train_file = filter(lambda file: s in file and 'trn' in file, files)[0]
+    dev_file = filter(lambda file: s in file and 'dev' in file, files)[0]
+    test_file = filter(lambda file: s in file and 'tst' in file, files)[0]
+    oov_file = filter(lambda file: s in file and 'OOV' in file, files)[0]
+    files_sorted = sorted([train_file, dev_file, test_file, oov_file])
+
+    all_dialogues = map(lambda x: get_dialogs(x, True), files_sorted)
+    return reduce(lambda x, y: x + y, all_dialogues, [])
+
+
 def parse_dialogs(lines, ignore_api_calls=False):
     data = []
     story = []
