@@ -28,9 +28,9 @@ def load_task(data_dir, task_id, only_supporting=False):
     test_file = filter(lambda file: s in file and 'tst' in file, files)[0]
     oov_file = filter(lambda file: s in file and 'OOV' in file, files)[0]
     train_data = get_dialogs(train_file, True)
-    dev_data = get_dialogs(dev_file, True)
-    test_data = get_dialogs(test_file, True)
-    oov_data = get_dialogs(oov_file, True)
+    dev_data = get_dialogs(dev_file, False)
+    test_data = get_dialogs(test_file, False)
+    oov_data = get_dialogs(oov_file, False)
     return train_data, dev_data, test_data, oov_data
 
 
