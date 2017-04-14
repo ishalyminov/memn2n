@@ -42,7 +42,7 @@ tf.flags.DEFINE_integer(
     20,
     "Embedding size for embedding matrices."
 )
-tf.flags.DEFINE_integer("memory_size", 3, "Maximum size of memory.")
+tf.flags.DEFINE_integer("memory_size", 20, "Maximum size of memory.")
 tf.flags.DEFINE_integer("task_id", 1, "bAbI task id, 1 <= id <= 6")
 tf.flags.DEFINE_integer("random_state", 273, "Random state.")
 tf.flags.DEFINE_string(
@@ -52,7 +52,7 @@ tf.flags.DEFINE_string(
 )
 tf.flags.DEFINE_string(
     "data_dir_plus",
-    "../babi_tools/babi_plus",
+    "../babi_tools/dialog-bAbI-tasks/",  # "../babi_tools/babi_plus",
     "Directory containing bAbI+ tasks"
 )
 FLAGS = tf.flags.FLAGS
