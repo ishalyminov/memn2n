@@ -1,8 +1,13 @@
 import os
+from collections import Counter
 
 import numpy as np
 
-from data_utils import tokenize
+
+def get_class_weights(in_class_labels):
+    counter = Counter(in_class_labels)
+    majority = max(counter.values())
+    return {cls: float(majority / count) for cls, count in counter.items()}
 
 
 def get_dialogs(f, ignore_api_calls):
@@ -57,7 +62,7 @@ def load_task_for_cv(data_dir, task_id):
 def parse_dialogs(lines, ignore_api_calls=False):
     data = []
     story = []
-    for line in lines:
+    for line_idx, line in enumerate(lines):
         line = line.lower().strip()
         if not line:
             continue
@@ -70,14 +75,14 @@ def parse_dialogs(lines, ignore_api_calls=False):
             data.append([])
         question, answer = q_a.split('\t')
         question = question.rstrip('?')
-        question = tokenize(question)
-        answer = tokenize(answer)
+        question = ['usr'] + [str(line_idx * 2 + 1)] + question.split()
+        answer = answer.split()
 
         # Provide all the substories
         substory = filter(lambda x: x, story)
         data[-1].append((substory, question, answer))
         story.append(question)
-        story.append(answer)
+        story.append(['sys'] + [str(line_idx * 2 + 2)] + answer)
     return filter(lambda x: x, data)
 
 

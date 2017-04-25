@@ -15,8 +15,8 @@ import numpy as np
 from dialog_data_utils import (
     vectorize_data_dialog,
     get_candidates_list,
-    load_task
-)
+    load_task,
+    get_class_weights)
 from memn2n import MemN2N
 
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
@@ -73,6 +73,12 @@ data = reduce(
     all_dialogues_babi + all_dialogues_babi_plus,
     []
 )
+max_story_size = max(map(len, (s for s, _, _ in data)))
+mean_story_size = int(np.mean([len(s) for s, _, _ in data]))
+sentence_size = max(map(len, chain.from_iterable(s for s, _, _ in data))) + 2
+query_size = max(map(len, (q for _, q, _ in data)))
+memory_size = min(FLAGS.memory_size, max_story_size)
+
 vocab = sorted(
     reduce(
         lambda x, y: x | y,
@@ -80,18 +86,20 @@ vocab = sorted(
     )
 )
 
-answer_candidates = get_candidates_list(FLAGS.data_dir)
-word_idx = dict((c, i + 1) for i, c in enumerate(vocab))
-answer_idx = dict(
-    (candidate, i + 1)
-    for i, candidate in enumerate(answer_candidates)
-)
 
-max_story_size = max(map(len, (s for s, _, _ in data)))
-mean_story_size = int(np.mean([len(s) for s, _, _ in data]))
-sentence_size = max(map(len, chain.from_iterable(s for s, _, _ in data)))
-query_size = max(map(len, (q for _, q, _ in data)))
-memory_size = min(FLAGS.memory_size, max_story_size)
+answer_candidates = get_candidates_list(FLAGS.data_dir)
+# answer_candidates = set([])
+# for dialogue in train_babi:
+#     for story in dialogue:
+#         answer_candidates.add(' '.join(story[2]).replace(' \' ', '\''))
+# answer_candidates = list(answer_candidates)
+
+word_idx = {c: i + 1 for i, c in enumerate(vocab)}
+answer_idx = {
+    candidate: i + 1
+    for i, candidate in enumerate(answer_candidates)
+}
+
 vocab_size = len(word_idx) + 1  # +1 for nil word
 answer_vocab_size = len(answer_idx) + 1
 sentence_size = max(query_size, sentence_size)  # for the position
@@ -103,6 +111,10 @@ print("Average story length", mean_story_size)
 
 def train_model(in_model, in_train_sqa, in_test_sqa, in_batches):
     best_train_accuracy, best_test_accuracy = 0.0, 0.0
+    class_weights = get_class_weights(
+        np.argmax(in_train_sqa[2] + in_test_sqa[2], axis=1)
+    )
+
     for t in range(1, FLAGS.epochs+1):
         s_train, q_train, a_train = in_train_sqa
         s_test, q_test, a_test = in_test_sqa
@@ -121,11 +133,19 @@ def train_model(in_model, in_train_sqa, in_test_sqa, in_batches):
         if t % FLAGS.evaluation_interval == 0:
             # evaluate on the whole trainset
             train_preds = in_model.predict(s_train, q_train)
-            train_acc = metrics.accuracy_score(train_preds, train_labels)
+            train_acc = metrics.accuracy_score(
+                train_preds,
+                train_labels,
+                sample_weight=[class_weights.get(label, 0.0) for label in train_labels]
+            )
 
             # evaluating on the whole testset
             test_preds = in_model.predict(s_test, q_test)
-            test_acc = metrics.accuracy_score(test_preds, test_labels)
+            test_acc = metrics.accuracy_score(
+                test_preds,
+                test_labels,
+                sample_weight=[class_weights.get(label, 0.0) for label in test_labels]
+            )
 
             logger.info('-----------------------')
             logger.info('Epoch:\t{}'.format(t))
@@ -139,8 +159,8 @@ def train_model(in_model, in_train_sqa, in_test_sqa, in_batches):
 
 
 def main():
-    dialogues_train = train_babi
-    dialogues_test = map(lambda x: [x[-1]], test_plus)
+    dialogues_train = map(lambda x: [x[-1]], train_babi)
+    dialogues_test = map(lambda x: [x[-1]], test_babi)
 
     data_train = reduce(lambda x, y: x + y, dialogues_train, [])
     data_test = reduce(lambda x, y: x + y, dialogues_test, [])
