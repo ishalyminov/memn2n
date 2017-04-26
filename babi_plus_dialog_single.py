@@ -35,7 +35,7 @@ tf.flags.DEFINE_integer(
     "Evaluate and print results every x epochs"
 )
 tf.flags.DEFINE_integer("batch_size", 1, "Batch size for training.")
-tf.flags.DEFINE_integer("hops", 3, "Number of hops in the Memory Network.")
+tf.flags.DEFINE_integer("hops", 2, "Number of hops in the Memory Network.")
 tf.flags.DEFINE_integer("epochs", 100, "Number of epochs to train for.")
 tf.flags.DEFINE_integer(
     "embedding_size",

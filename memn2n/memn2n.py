@@ -128,8 +128,11 @@ class MemN2N(object):
         cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits, tf.cast(self._answers, tf.float32), name="cross_entropy")
         cross_entropy_sum = tf.reduce_sum(cross_entropy, name="cross_entropy_sum")
 
+        l2 = \
+            tf.nn.l2_loss(self.H) + \
+            tf.nn.l2_loss(self.W)
         # loss op
-        loss_op = cross_entropy_sum
+        loss_op = cross_entropy_sum + l2
 
         # gradient pipeline
         grads_and_vars = self._opt.compute_gradients(loss_op)
