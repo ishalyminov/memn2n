@@ -62,7 +62,8 @@ def load_task_for_cv(data_dir, task_id):
 def parse_dialogs(lines, ignore_api_calls=False):
     data = []
     story = []
-    for line_idx, line in enumerate(lines):
+    line_idx = 0
+    for line in lines:
         line = line.lower().strip()
         if not line:
             continue
@@ -71,6 +72,7 @@ def parse_dialogs(lines, ignore_api_calls=False):
         nid, q_a = line.split(' ', 1)
         nid = int(nid)
         if nid == 1:
+            line_idx = 0
             story = []
             data.append([])
         question, answer = q_a.split('\t')
@@ -83,6 +85,7 @@ def parse_dialogs(lines, ignore_api_calls=False):
         data[-1].append((substory, question, answer))
         story.append(question)
         story.append(['sys'] + [str(line_idx * 2 + 2)] + answer)
+        line_idx += 1
     return filter(lambda x: x, data)
 
 
@@ -123,10 +126,21 @@ def vectorize_data_dialog(data, word_idx, answer_idx, sentence_size, memory_size
         lq = max(0, sentence_size - len(query))
         q = [word_idx[w] for w in query] + [0] * lq
 
-        y = np.zeros(len(answer_idx) + 1) # 0 is reserved for nil word
-        y[answer_idx[' '.join(answer).replace(' \' ', '\'')]] = 1
+        # answer 1-hot for the label prediction
+        y = np.zeros(len(answer_idx) + 1)  # 0 is reserved for nil word
+        y[answer_idx[' '.join(answer)]] = 1
 
         S.append(ss)
         Q.append(q)
         A.append(y)
     return np.array(S), np.array(Q), np.array(A)
+
+
+def vectorize_answers(answers, word_idx, sentence_size):
+    result = [[0] * sentence_size]
+    for answer in answers:
+        answer_tokens = answer.strip().split()
+        answer_length = max(0, sentence_size - len(answer_tokens))
+        a = [word_idx[w] for w in answer_tokens] + [0] * answer_length
+        result.append(a)
+    return np.array(result)

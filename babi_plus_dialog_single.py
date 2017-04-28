@@ -16,7 +16,8 @@ from dialog_data_utils import (
     vectorize_data_dialog,
     get_candidates_list,
     load_task,
-    get_class_weights)
+    get_class_weights,
+    vectorize_answers)
 from memn2n import MemN2N
 
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
@@ -79,20 +80,17 @@ sentence_size = max(map(len, chain.from_iterable(s for s, _, _ in data))) + 2
 query_size = max(map(len, (q for _, q, _ in data)))
 memory_size = min(FLAGS.memory_size, max_story_size)
 
-vocab = sorted(
-    reduce(
-        lambda x, y: x | y,
-        (set(list(chain.from_iterable(s)) + q + a) for s, q, a in data)
-    )
-)
-
-
 answer_candidates = get_candidates_list(FLAGS.data_dir)
-# answer_candidates = set([])
-# for dialogue in train_babi:
-#     for story in dialogue:
-#         answer_candidates.add(' '.join(story[2]).replace(' \' ', '\''))
-# answer_candidates = list(answer_candidates)
+
+vocab = reduce(
+    lambda x, y: x | y,
+    (set(list(chain.from_iterable(s)) + q + a) for s, q, a in data)
+)
+vocab |= reduce(
+    lambda x, y: x | y,
+    [set(answer.split()) for answer in answer_candidates]
+)
+vocab = sorted(vocab)
 
 word_idx = {c: i + 1 for i, c in enumerate(vocab)}
 answer_idx = {
@@ -103,6 +101,8 @@ answer_idx = {
 vocab_size = len(word_idx) + 1  # +1 for nil word
 answer_vocab_size = len(answer_idx) + 1
 sentence_size = max(query_size, sentence_size)  # for the position
+
+answers_vectorized = vectorize_answers(answer_candidates, word_idx, sentence_size)
 
 print("Longest sentence length", sentence_size)
 print("Longest story length", max_story_size)
@@ -205,7 +205,7 @@ def main():
             sentence_size,
             memory_size,
             FLAGS.embedding_size,
-            answer_vocab_size=answer_vocab_size,
+            answers_vectorized,
             session=sess,
             hops=FLAGS.hops,
             max_grad_norm=FLAGS.max_grad_norm,

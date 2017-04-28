@@ -60,7 +60,7 @@ class MemN2N(object):
         sentence_size,
         memory_size,
         embedding_size,
-        answer_vocab_size=None,
+        answers,
         hops=3,
         max_grad_norm=40.0,
         nonlin=None,
@@ -115,24 +115,27 @@ class MemN2N(object):
         self._init = initializer
         self._opt = optimizer
         self._name = name
-        self._answer_vocab_size = answer_vocab_size \
-            if answer_vocab_size \
-            else self._vocab_size
+        self._answers_one_hot = tf.pack(answers, name='answers_one_hot')
+        self._answer_vocab_size = self._answers_one_hot.get_shape()[0].value
 
         self._build_inputs()
         self._build_vars()
         self._encoding = tf.constant(encoding(self._sentence_size, self._embedding_size), name="encoding")
 
         # cross entropy
-        logits = self._inference(self._stories, self._queries) # (batch_size, vocab_size)
-        cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits, tf.cast(self._answers, tf.float32), name="cross_entropy")
-        cross_entropy_sum = tf.reduce_sum(cross_entropy, name="cross_entropy_sum")
+        logits = self._inference(self._stories, self._queries)  # (batch_size, answer_vocab_size)
+        cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
+            logits,
+            tf.cast(self._answer_labels, tf.float32),
+            name="cross_entropy"
+        )
+        cross_entropy_sum = tf.reduce_sum(
+            cross_entropy,
+            name="cross_entropy_sum"
+        )
 
-        l2 = \
-            tf.nn.l2_loss(self.H) + \
-            tf.nn.l2_loss(self.W)
         # loss op
-        loss_op = cross_entropy_sum + l2
+        loss_op = cross_entropy_sum
 
         # gradient pipeline
         grads_and_vars = self._opt.compute_gradients(loss_op)
@@ -165,7 +168,7 @@ class MemN2N(object):
     def _build_inputs(self):
         self._stories = tf.placeholder(tf.int32, [None, self._memory_size, self._sentence_size], name="stories")
         self._queries = tf.placeholder(tf.int32, [None, self._sentence_size], name="queries")
-        self._answers = tf.placeholder(tf.int32, [None, self._answer_vocab_size], name="answers")
+        self._answer_labels = tf.placeholder(tf.int32, [None, self._answer_vocab_size], name="answer_labels")
 
     def _build_vars(self):
         with tf.variable_scope(self._name):
@@ -178,7 +181,7 @@ class MemN2N(object):
             self.TA = tf.Variable(self._init([self._memory_size, self._embedding_size]), name='TA')
 
             self.H = tf.Variable(self._init([self._embedding_size, self._embedding_size]), name="H")
-            self.W = tf.Variable(self._init([self._embedding_size, self._answer_vocab_size]), name="W")
+            self.W = tf.Variable(self._init([self._answer_vocab_size, self._embedding_size]), name="W")
         self._nil_vars = set([self.A.name, self.B.name])
 
     def _inference(self, stories, queries):
@@ -206,8 +209,9 @@ class MemN2N(object):
                     u_k = nonlin(u_k)
 
                 u.append(u_k)
-
-            return tf.matmul(u_k, self.W)
+            a_emb = tf.nn.embedding_lookup(self.W, self._answers_one_hot)
+            a = tf.reduce_sum(a_emb * self._encoding, 1)
+            return tf.matmul(u_k, a, transpose_b=True)
 
     def batch_fit(self, stories, queries, answers):
         """Runs the training algorithm over the passed batch
@@ -220,7 +224,7 @@ class MemN2N(object):
         Returns:
             loss: floating-point number, the loss computed for the batch
         """
-        feed_dict = {self._stories: stories, self._queries: queries, self._answers: answers}
+        feed_dict = {self._stories: stories, self._queries: queries, self._answer_labels: answers}
         loss, _ = self._sess.run([self.loss_op, self.train_op], feed_dict=feed_dict)
         return loss
 
