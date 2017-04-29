@@ -35,15 +35,15 @@ tf.flags.DEFINE_integer(
     1,
     "Evaluate and print results every x epochs"
 )
-tf.flags.DEFINE_integer("batch_size", 1, "Batch size for training.")
+tf.flags.DEFINE_integer("batch_size", 8, "Batch size for training.")
 tf.flags.DEFINE_integer("hops", 3, "Number of hops in the Memory Network.")
-tf.flags.DEFINE_integer("epochs", 100, "Number of epochs to train for.")
+tf.flags.DEFINE_integer("epochs", 200, "Number of epochs to train for.")
 tf.flags.DEFINE_integer(
     "embedding_size",
     20,
     "Embedding size for embedding matrices."
 )
-tf.flags.DEFINE_integer("memory_size", 20, "Maximum size of memory.")
+tf.flags.DEFINE_integer("memory_size", 64, "Maximum size of memory.")
 tf.flags.DEFINE_integer("task_id", 1, "bAbI task id, 1 <= id <= 6")
 tf.flags.DEFINE_integer("random_state", 273, "Random state.")
 tf.flags.DEFINE_string(
@@ -111,9 +111,6 @@ print("Average story length", mean_story_size)
 
 def train_model(in_model, in_train_sqa, in_test_sqa, in_batches):
     best_train_accuracy, best_test_accuracy = 0.0, 0.0
-    class_weights = get_class_weights(
-        np.argmax(in_train_sqa[2] + in_test_sqa[2], axis=1)
-    )
 
     for t in range(1, FLAGS.epochs+1):
         s_train, q_train, a_train = in_train_sqa
@@ -135,16 +132,14 @@ def train_model(in_model, in_train_sqa, in_test_sqa, in_batches):
             train_preds = in_model.predict(s_train, q_train)
             train_acc = metrics.accuracy_score(
                 train_preds,
-                train_labels,
-                sample_weight=[class_weights.get(label, 0.0) for label in train_labels]
+                train_labels
             )
 
             # evaluating on the whole testset
             test_preds = in_model.predict(s_test, q_test)
             test_acc = metrics.accuracy_score(
                 test_preds,
-                test_labels,
-                sample_weight=[class_weights.get(label, 0.0) for label in test_labels]
+                test_labels
             )
 
             logger.info('-----------------------')
