@@ -17,8 +17,8 @@ import numpy as np
 from dialog_data_utils import (
     vectorize_data_dialog,
     get_candidates_list,
-    load_task_for_cv
-)
+    load_task_for_cv,
+    vectorize_answers)
 from memn2n import MemN2N
 
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
@@ -36,15 +36,15 @@ tf.flags.DEFINE_integer(
     1,
     "Evaluate and print results every x epochs"
 )
-tf.flags.DEFINE_integer("batch_size", 1, "Batch size for training.")
+tf.flags.DEFINE_integer("batch_size", 8, "Batch size for training.")
 tf.flags.DEFINE_integer("hops", 3, "Number of hops in the Memory Network.")
-tf.flags.DEFINE_integer("epochs", 100, "Number of epochs to train for.")
+tf.flags.DEFINE_integer("epochs", 200, "Number of epochs to train for.")
 tf.flags.DEFINE_integer(
     "embedding_size",
     20,
     "Embedding size for embedding matrices."
 )
-tf.flags.DEFINE_integer("memory_size", 3, "Maximum size of memory.")
+tf.flags.DEFINE_integer("memory_size", 64, "Maximum size of memory.")
 tf.flags.DEFINE_integer("task_id", 1, "bAbI task id, 1 <= id <= 6")
 tf.flags.DEFINE_integer("random_state", 273, "Random state.")
 tf.flags.DEFINE_string(
@@ -54,7 +54,7 @@ tf.flags.DEFINE_string(
 )
 tf.flags.DEFINE_string(
     "data_dir_plus",
-    "../babi_tools/babi_plus",
+    "../babi_tools/dialog-bAbI-tasks/",  # "../babi_tools/babi_plus",
     "Directory containing bAbI+ tasks"
 )
 FLAGS = tf.flags.FLAGS
@@ -72,28 +72,36 @@ data = reduce(
     all_dialogues_babi + all_dialogues_babi_plus,
     []
 )
-vocab = sorted(
-    reduce(
-        lambda x, y: x | y,
-        (set(list(chain.from_iterable(s)) + q + a) for s, q, a in data)
-    )
-)
-
-answer_candidates = get_candidates_list(FLAGS.data_dir)
-word_idx = dict((c, i + 1) for i, c in enumerate(vocab))
-answer_idx = dict(
-    (candidate, i + 1)
-    for i, candidate in enumerate(answer_candidates)
-)
 
 max_story_size = max(map(len, (s for s, _, _ in data)))
 mean_story_size = int(np.mean([len(s) for s, _, _ in data]))
-sentence_size = max(map(len, chain.from_iterable(s for s, _, _ in data)))
+sentence_size = max(map(len, chain.from_iterable(s for s, _, _ in data))) + 2
 query_size = max(map(len, (q for _, q, _ in data)))
 memory_size = min(FLAGS.memory_size, max_story_size)
+
+answer_candidates = get_candidates_list(FLAGS.data_dir)
+
+vocab = reduce(
+    lambda x, y: x | y,
+    (set(list(chain.from_iterable(s)) + q + a) for s, q, a in data)
+)
+vocab |= reduce(
+    lambda x, y: x | y,
+    [set(answer.split()) for answer in answer_candidates]
+)
+vocab = sorted(vocab)
+
+word_idx = {c: i + 1 for i, c in enumerate(vocab)}
+answer_idx = {
+    candidate: i + 1
+    for i, candidate in enumerate(answer_candidates)
+}
+
 vocab_size = len(word_idx) + 1  # +1 for nil word
 answer_vocab_size = len(answer_idx) + 1
 sentence_size = max(query_size, sentence_size)  # for the position
+
+answers_vectorized = vectorize_answers(answer_candidates, word_idx, sentence_size)
 
 print("Longest sentence length", sentence_size)
 print("Longest story length", max_story_size)
@@ -203,7 +211,7 @@ def main(
             sentence_size,
             memory_size,
             FLAGS.embedding_size,
-            answer_vocab_size=answer_vocab_size,
+            answers_vectorized,
             session=sess,
             hops=FLAGS.hops,
             max_grad_norm=FLAGS.max_grad_norm,

@@ -16,8 +16,8 @@ from dialog_data_utils import (
     vectorize_data_dialog,
     get_candidates_list,
     load_task,
-    get_class_weights,
-    vectorize_answers)
+    vectorize_answers
+)
 from memn2n import MemN2N
 
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)

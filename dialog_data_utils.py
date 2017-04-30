@@ -49,10 +49,10 @@ def load_task_for_cv(data_dir, task_id):
     files = os.listdir(data_dir)
     files = [os.path.join(data_dir, f) for f in files]
     s = 'dialog-babi-task{}'.format(task_id)
-    train_file = filter(lambda file: s in file and 'trn' in file, files)[0]
-    dev_file = filter(lambda file: s in file and 'dev' in file, files)[0]
-    test_file = filter(lambda file: s in file and 'tst' in file, files)[0]
-    oov_file = filter(lambda file: s in file and 'OOV' in file, files)[0]
+    train_file = filter(lambda file: s in file and 'trn.txt' in file, files)[0]
+    dev_file = filter(lambda file: s in file and 'dev.txt' in file, files)[0]
+    test_file = filter(lambda file: s in file and 'tst.txt' in file, files)[0]
+    oov_file = filter(lambda file: s in file and 'OOV.txt' in file, files)[0]
     files_sorted = sorted([train_file, dev_file, test_file, oov_file])
 
     all_dialogues = map(lambda x: get_dialogs(x, True), files_sorted)
