@@ -39,7 +39,7 @@ def load_task(data_dir, task_id, only_supporting=False):
     return train_data, dev_data, test_data, oov_data
 
 
-def load_task_for_cv(data_dir, task_id):
+def load_task_for_cv(data_dir, task_id, ignore_api_calls):
     '''Load the nth task. There are 6 tasks in total.
 
     Returns a tuple containing the training and testing data for the task.
@@ -55,7 +55,7 @@ def load_task_for_cv(data_dir, task_id):
     oov_file = filter(lambda file: s in file and 'OOV.txt' in file, files)[0]
     files_sorted = sorted([train_file, dev_file, test_file, oov_file])
 
-    all_dialogues = map(lambda x: get_dialogs(x, True), files_sorted)
+    all_dialogues = map(lambda x: get_dialogs(x, ignore_api_calls), files_sorted)
     return reduce(lambda x, y: x + y, all_dialogues, [])
 
 

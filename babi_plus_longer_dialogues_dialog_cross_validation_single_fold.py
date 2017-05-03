@@ -54,7 +54,7 @@ tf.flags.DEFINE_string(
 )
 tf.flags.DEFINE_string(
     "data_dir_plus",
-    "../babi_tools/dialog-bAbI-tasks/",  # "../babi_tools/babi_plus",
+    "../babi_tools/babi_plus",
     "Directory containing bAbI+ tasks"
 )
 FLAGS = tf.flags.FLAGS
@@ -64,8 +64,10 @@ random.seed(FLAGS.random_state)
 print("Started Task:", FLAGS.task_id)
 
 # task data
-all_dialogues_babi = load_task_for_cv(FLAGS.data_dir, FLAGS.task_id)
-all_dialogues_babi_plus = load_task_for_cv(FLAGS.data_dir_plus, FLAGS.task_id)
+IGNORE_API_CALLS = False
+
+all_dialogues_babi = load_task_for_cv(FLAGS.data_dir, FLAGS.task_id, IGNORE_API_CALLS)
+all_dialogues_babi_plus = load_task_for_cv(FLAGS.data_dir_plus, FLAGS.task_id, IGNORE_API_CALLS)
 
 data = reduce(
     lambda x, y: x + y,
@@ -166,7 +168,8 @@ def main(
         testset_idx.append(in_dataset_shuffle[test_dialogue_counter % len(in_dataset_shuffle)])
 
     dialogues_train = map(lambda x: all_dialogues_babi[x], trainset_idx)
-    dialogues_test = map(lambda x: all_dialogues_babi_plus[x], testset_idx)
+    # testing on API calls only
+    dialogues_test = map(lambda x: [all_dialogues_babi_plus[x][-1]], testset_idx)
 
     data_train = reduce(lambda x, y: x + y, dialogues_train, [])
     data_test = reduce(lambda x, y: x + y, dialogues_test, [])
