@@ -154,8 +154,8 @@ def train_model(in_model, in_train_sqa, in_test_sqa, in_batches):
 
 
 def main():
-    dialogues_train = map(lambda x: [x[-1]], train_babi)
-    dialogues_test = map(lambda x: [x[-1]], test_babi)
+    dialogues_train = map(lambda x: x, train_babi)
+    dialogues_test = map(lambda x: [x[-1]], test_plus)
 
     data_train = reduce(lambda x, y: x + y, dialogues_train, [])
     data_test = reduce(lambda x, y: x + y, dialogues_test, [])
