@@ -174,19 +174,20 @@ class MemN2N(object):
         with tf.variable_scope(self._name):
             nil_word_slot = tf.zeros([1, self._embedding_size])
             A = tf.concat(0, [ nil_word_slot, self._init([self._vocab_size-1, self._embedding_size]) ])
-            B = tf.concat(0, [ nil_word_slot, self._init([self._vocab_size-1, self._embedding_size]) ])
+            # B = tf.concat(0, [ nil_word_slot, self._init([self._vocab_size-1, self._embedding_size]) ])
             self.A = tf.Variable(A, name="A")
-            self.B = tf.Variable(B, name="B")
+            # self.B = tf.Variable(B, name="B")
 
             self.TA = tf.Variable(self._init([self._memory_size, self._embedding_size]), name='TA')
 
             self.H = tf.Variable(self._init([self._embedding_size, self._embedding_size]), name="H")
             self.W = tf.Variable(self._init([self._answer_vocab_size, self._embedding_size]), name="W")
-        self._nil_vars = set([self.A.name, self.B.name])
+        self._nil_vars = set([self.A.name])  # , self.B.name])
 
     def _inference(self, stories, queries):
         with tf.variable_scope(self._name):
-            q_emb = tf.nn.embedding_lookup(self.B, queries)
+            # same embedding for stories and queries
+            q_emb = tf.nn.embedding_lookup(self.A, queries)
             u_0 = tf.reduce_sum(q_emb * self._encoding, 1)
             u = [u_0]
             for _ in range(self._hops):

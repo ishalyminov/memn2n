@@ -36,11 +36,11 @@ tf.flags.DEFINE_integer(
     "Evaluate and print results every x epochs"
 )
 tf.flags.DEFINE_integer("batch_size", 8, "Batch size for training.")
-tf.flags.DEFINE_integer("hops", 3, "Number of hops in the Memory Network.")
-tf.flags.DEFINE_integer("epochs", 200, "Number of epochs to train for.")
+tf.flags.DEFINE_integer("hops", 1, "Number of hops in the Memory Network.")
+tf.flags.DEFINE_integer("epochs", 100, "Number of epochs to train for.")
 tf.flags.DEFINE_integer(
     "embedding_size",
-    20,
+    128,
     "Embedding size for embedding matrices."
 )
 tf.flags.DEFINE_integer("memory_size", 64, "Maximum size of memory.")
@@ -53,7 +53,7 @@ tf.flags.DEFINE_string(
 )
 tf.flags.DEFINE_string(
     "data_dir_plus",
-    "../babi_tools/dialog-bAbI-tasks/",  # "../babi_tools/babi_plus",
+    "../babi_tools/dialog-bAbI-tasks/",
     "Directory containing bAbI+ tasks"
 )
 FLAGS = tf.flags.FLAGS
@@ -155,7 +155,8 @@ def train_model(in_model, in_train_sqa, in_test_sqa, in_batches):
 
 def main():
     dialogues_train = map(lambda x: x, train_babi)
-    dialogues_test = map(lambda x: [x[-1]], test_plus)
+    dialogues_test = map(lambda x: x, test_plus)
+    dialogues_test_api = map(lambda x: [x[-1]], test_plus)
 
     data_train = reduce(lambda x, y: x + y, dialogues_train, [])
     data_test = reduce(lambda x, y: x + y, dialogues_test, [])
@@ -182,9 +183,9 @@ def main():
 
     tf.set_random_seed(FLAGS.random_state)
     batch_size = FLAGS.batch_size
-    optimizer = tf.train.AdamOptimizer(
-        learning_rate=FLAGS.learning_rate,
-        epsilon=FLAGS.epsilon
+    optimizer = tf.train.GradientDescentOptimizer(
+        learning_rate=FLAGS.learning_rate  # ,
+        # epsilon=FLAGS.epsilon
     )
 
     batches = zip(
