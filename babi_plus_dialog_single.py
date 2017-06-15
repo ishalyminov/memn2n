@@ -37,7 +37,7 @@ tf.flags.DEFINE_integer(
 )
 tf.flags.DEFINE_integer("batch_size", 8, "Batch size for training.")
 tf.flags.DEFINE_integer("hops", 1, "Number of hops in the Memory Network.")
-tf.flags.DEFINE_integer("epochs", 100, "Number of epochs to train for.")
+tf.flags.DEFINE_integer("epochs", 3, "Number of epochs to train for.")
 tf.flags.DEFINE_integer(
     "embedding_size",
     128,
@@ -48,17 +48,18 @@ tf.flags.DEFINE_integer("task_id", 1, "bAbI task id, 1 <= id <= 6")
 tf.flags.DEFINE_integer("random_state", 273, "Random state.")
 tf.flags.DEFINE_string(
     "data_dir",
-    "../babi_tools/dialog-bAbI-tasks/",
+    "../babi_tools/babi_plus/",
     "Directory containing bAbI tasks"
 )
 tf.flags.DEFINE_string(
     "data_dir_plus",
-    "../babi_tools/dialog-bAbI-tasks/",
+    "../babi_tools/babi_plus/",
     "Directory containing bAbI+ tasks"
 )
 FLAGS = tf.flags.FLAGS
 
 random.seed(FLAGS.random_state)
+np.random.seed(FLAGS.random_state)
 
 print("Started Task:", FLAGS.task_id)
 
@@ -109,13 +110,18 @@ print("Longest story length", max_story_size)
 print("Average story length", mean_story_size)
 
 
-def train_model(in_model, in_train_sqa, in_test_sqa, in_batches):
+# in_train_sqa - trainset
+# in_train_eval_sqa - trainset for evaluation (may be API calls only)
+# # in_test_sqa - testset for evaluation
+def train_model(in_model, in_train_sqa, in_train_eval_sqa, in_test_sqa, in_batches):
     best_train_accuracy, best_test_accuracy = 0.0, 0.0
 
     for t in range(1, FLAGS.epochs+1):
         s_train, q_train, a_train = in_train_sqa
+        s_train_eval, q_train_eval, a_train_eval = in_train_eval_sqa
         s_test, q_test, a_test = in_test_sqa
         train_labels = np.argmax(a_train, axis=1)
+        train_eval_labels = np.argmax(a_train_eval, axis=1)
         test_labels = np.argmax(a_test, axis=1)
         np.random.shuffle(in_batches)
         total_cost = 0.0
@@ -129,10 +135,10 @@ def train_model(in_model, in_train_sqa, in_test_sqa, in_batches):
 
         if t % FLAGS.evaluation_interval == 0:
             # evaluate on the whole trainset
-            train_preds = in_model.predict(s_train, q_train)
+            train_preds = in_model.predict(s_train_eval, q_train_eval)
             train_acc = metrics.accuracy_score(
                 train_preds,
-                train_labels
+                train_eval_labels
             )
 
             # evaluating on the whole testset
@@ -155,14 +161,23 @@ def train_model(in_model, in_train_sqa, in_test_sqa, in_batches):
 
 def main():
     dialogues_train = map(lambda x: x, train_babi)
-    dialogues_test = map(lambda x: x, test_plus)
-    dialogues_test_api = map(lambda x: [x[-1]], test_plus)
+    dialogues_train_eval = map(lambda x: [x[-1]], train_babi)
+    # testing only on API calls?
+    dialogues_test = map(lambda x: [x[-1]], test_plus)
 
     data_train = reduce(lambda x, y: x + y, dialogues_train, [])
+    data_train_eval = reduce(lambda x, y: x + y, dialogues_train_eval, [])
     data_test = reduce(lambda x, y: x + y, dialogues_test, [])
 
     train_s, train_q, train_a = vectorize_data_dialog(
         data_train,
+        word_idx,
+        answer_idx,
+        sentence_size,
+        memory_size
+    )
+    train_eval_s, train_eval_q, train_eval_a = vectorize_data_dialog(
+        data_train_eval,
         word_idx,
         answer_idx,
         sentence_size,
@@ -177,15 +192,16 @@ def main():
     )
 
     print("Training Size (dialogues)", len(dialogues_train))
+    print("Training/Evaluation Size (dialogues)", len(dialogues_train_eval))
     print("Testing Size (dialogues)", len(dialogues_test))
     print("Training Size (stories)", len(data_train))
+    print("Training/Evaluation Size (stories)", len(data_train_eval))
     print("Testing Size (stories)", len(data_test))
 
     tf.set_random_seed(FLAGS.random_state)
     batch_size = FLAGS.batch_size
     optimizer = tf.train.GradientDescentOptimizer(
-        learning_rate=FLAGS.learning_rate  # ,
-        # epsilon=FLAGS.epsilon
+        learning_rate=FLAGS.learning_rate
     )
 
     batches = zip(
@@ -193,6 +209,7 @@ def main():
         range(batch_size, len(data_train), batch_size)
     )
     batches = [(start, end) for start, end in batches]
+
 
     with tf.Session() as sess:
         model = MemN2N(
@@ -210,6 +227,7 @@ def main():
         best_accuracy_per_epoch = train_model(
             model,
             (train_s, train_q, train_a),
+            (train_eval_s, train_eval_q, train_eval_a),
             (test_s, test_q, test_a),
             batches
         )

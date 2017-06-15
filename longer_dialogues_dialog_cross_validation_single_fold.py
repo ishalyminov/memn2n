@@ -36,15 +36,15 @@ tf.flags.DEFINE_integer(
     1,
     "Evaluate and print results every x epochs"
 )
-tf.flags.DEFINE_integer("batch_size", 1, "Batch size for training.")
-tf.flags.DEFINE_integer("hops", 3, "Number of hops in the Memory Network.")
+tf.flags.DEFINE_integer("batch_size", 8, "Batch size for training.")
+tf.flags.DEFINE_integer("hops", 1, "Number of hops in the Memory Network.")
 tf.flags.DEFINE_integer("epochs", 100, "Number of epochs to train for.")
 tf.flags.DEFINE_integer(
     "embedding_size",
-    20,
+    128,
     "Embedding size for embedding matrices."
 )
-tf.flags.DEFINE_integer("memory_size", 20, "Maximum size of memory.")
+tf.flags.DEFINE_integer("memory_size", 64, "Maximum size of memory.")
 tf.flags.DEFINE_integer("task_id", 1, "bAbI task id, 1 <= id <= 6")
 tf.flags.DEFINE_integer("random_state", 273, "Random state.")
 tf.flags.DEFINE_string(

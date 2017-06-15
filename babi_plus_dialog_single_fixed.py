@@ -4,11 +4,10 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 import random
-import sys
-import os
 from itertools import chain
 from six.moves import range, reduce
 import logging
+import sys
 
 from sklearn import metrics
 import tensorflow as tf
@@ -17,8 +16,9 @@ import numpy as np
 from dialog_data_utils import (
     vectorize_data_dialog,
     get_candidates_list,
-    load_task_for_cv,
-    vectorize_answers)
+    load_task,
+    vectorize_answers
+)
 from memn2n import MemN2N
 
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
@@ -49,32 +49,33 @@ tf.flags.DEFINE_integer("task_id", 1, "bAbI task id, 1 <= id <= 6")
 tf.flags.DEFINE_integer("random_state", 273, "Random state.")
 tf.flags.DEFINE_string(
     "data_dir",
-    "../babi_tools/babi_plus/",
+    sys.argv[1],
     "Directory containing bAbI tasks"
 )
 tf.flags.DEFINE_string(
     "data_dir_plus",
-    "../babi_tools/babi_plus/",
+    sys.argv[2],
     "Directory containing bAbI+ tasks"
 )
 FLAGS = tf.flags.FLAGS
 
 random.seed(FLAGS.random_state)
+np.random.seed(FLAGS.random_state)
 
 print("Started Task:", FLAGS.task_id)
 
 # task data
-IGNORE_API_CALLS = False
+train_babi, dev_babi, test_babi, test_oov_babi = load_task(FLAGS.data_dir, FLAGS.task_id)
+train_plus, dev_plus, test_plus, test_oov_plus = load_task(FLAGS.data_dir_plus, FLAGS.task_id)
 
-all_dialogues_babi = load_task_for_cv(FLAGS.data_dir, FLAGS.task_id, IGNORE_API_CALLS)
-all_dialogues_babi_plus = load_task_for_cv(FLAGS.data_dir_plus, FLAGS.task_id, IGNORE_API_CALLS)
+all_dialogues_babi = train_babi + dev_babi + test_babi + test_oov_babi
+all_dialogues_babi_plus = train_plus + dev_plus + test_plus + test_oov_plus
 
 data = reduce(
     lambda x, y: x + y,
     all_dialogues_babi + all_dialogues_babi_plus,
     []
 )
-
 max_story_size = max(map(len, (s for s, _, _ in data)))
 mean_story_size = int(np.mean([len(s) for s, _, _ in data]))
 sentence_size = max(map(len, chain.from_iterable(s for s, _, _ in data))) + 2
@@ -110,12 +111,18 @@ print("Longest story length", max_story_size)
 print("Average story length", mean_story_size)
 
 
-def train_model(in_model, in_train_sqa, in_test_sqa, in_batches):
+# in_train_sqa - trainset
+# in_train_eval_sqa - trainset for evaluation (may be API calls only)
+# # in_test_sqa - testset for evaluation
+def train_model(in_model, in_train_sqa, in_train_eval_sqa, in_test_sqa, in_batches):
     best_train_accuracy, best_test_accuracy = 0.0, 0.0
+
     for t in range(1, FLAGS.epochs+1):
         s_train, q_train, a_train = in_train_sqa
+        s_train_eval, q_train_eval, a_train_eval = in_train_eval_sqa
         s_test, q_test, a_test = in_test_sqa
         train_labels = np.argmax(a_train, axis=1)
+        train_eval_labels = np.argmax(a_train_eval, axis=1)
         test_labels = np.argmax(a_test, axis=1)
         np.random.shuffle(in_batches)
         total_cost = 0.0
@@ -129,12 +136,18 @@ def train_model(in_model, in_train_sqa, in_test_sqa, in_batches):
 
         if t % FLAGS.evaluation_interval == 0:
             # evaluate on the whole trainset
-            train_preds = in_model.predict(s_train, q_train)
-            train_acc = metrics.accuracy_score(train_preds, train_labels)
+            train_preds = in_model.predict(s_train_eval, q_train_eval)
+            train_acc = metrics.accuracy_score(
+                train_preds,
+                train_eval_labels
+            )
 
             # evaluating on the whole testset
             test_preds = in_model.predict(s_test, q_test)
-            test_acc = metrics.accuracy_score(test_preds, test_labels)
+            test_acc = metrics.accuracy_score(
+                test_preds,
+                test_labels
+            )
 
             logger.info('-----------------------')
             logger.info('Epoch:\t{}'.format(t))
@@ -147,35 +160,25 @@ def train_model(in_model, in_train_sqa, in_test_sqa, in_batches):
     return best_train_accuracy, best_test_accuracy
 
 
-def main(
-    in_trainset_size,
-    in_testset_size,
-    in_fold_number,
-    in_dataset_shuffle
-):
-    max_dialogue_length = max(map(len, all_dialogues_babi))
-    longer_dialogues_idx = filter(
-        lambda x: len(all_dialogues_babi[x]) == max_dialogue_length,
-        in_dataset_shuffle
-    )
-
-    trainset_idx = []
-    for train_dialogue_counter in range(in_trainset_size * in_fold_number, in_trainset_size * (in_fold_number + 1)):
-        trainset_idx.append(longer_dialogues_idx[train_dialogue_counter % len(longer_dialogues_idx)])
-
-    testset_idx = []
-    for test_dialogue_counter in range(in_testset_size * in_fold_number, in_testset_size * (in_fold_number + 1)):
-        testset_idx.append(in_dataset_shuffle[test_dialogue_counter % len(in_dataset_shuffle)])
-
-    dialogues_train = map(lambda x: all_dialogues_babi[x], trainset_idx)
-    # testing on API calls only?
-    dialogues_test = map(lambda x: [all_dialogues_babi_plus[x][-1]], testset_idx)
+def main():
+    dialogues_train = map(lambda x: x, train_babi)
+    dialogues_train_eval = map(lambda x: [x[-1]], train_babi)
+    # testing only on API calls?
+    dialogues_test = map(lambda x: [x[-1]], test_plus)
 
     data_train = reduce(lambda x, y: x + y, dialogues_train, [])
+    data_train_eval = reduce(lambda x, y: x + y, dialogues_train_eval, [])
     data_test = reduce(lambda x, y: x + y, dialogues_test, [])
 
     train_s, train_q, train_a = vectorize_data_dialog(
         data_train,
+        word_idx,
+        answer_idx,
+        sentence_size,
+        memory_size
+    )
+    train_eval_s, train_eval_q, train_eval_a = vectorize_data_dialog(
+        data_train_eval,
         word_idx,
         answer_idx,
         sentence_size,
@@ -190,15 +193,16 @@ def main(
     )
 
     print("Training Size (dialogues)", len(dialogues_train))
+    print("Training/Evaluation Size (dialogues)", len(dialogues_train_eval))
     print("Testing Size (dialogues)", len(dialogues_test))
     print("Training Size (stories)", len(data_train))
+    print("Training/Evaluation Size (stories)", len(data_train_eval))
     print("Testing Size (stories)", len(data_test))
 
     tf.set_random_seed(FLAGS.random_state)
     batch_size = FLAGS.batch_size
     optimizer = tf.train.GradientDescentOptimizer(
-        learning_rate=FLAGS.learning_rate  # ,
-        # epsilon=FLAGS.epsilon
+        learning_rate=FLAGS.learning_rate
     )
 
     batches = zip(
@@ -206,6 +210,7 @@ def main(
         range(batch_size, len(data_train), batch_size)
     )
     batches = [(start, end) for start, end in batches]
+
 
     with tf.Session() as sess:
         model = MemN2N(
@@ -223,6 +228,7 @@ def main(
         best_accuracy_per_epoch = train_model(
             model,
             (train_s, train_q, train_a),
+            (train_eval_s, train_eval_q, train_eval_a),
             (test_s, test_q, test_a),
             batches
         )
@@ -230,24 +236,6 @@ def main(
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 5:
-        print(
-            'Usage: {} <trainset size> <testset size> <#fold> <dataset shuffle>'
-                .format(os.path.basename(__file__))
-        )
-        exit()
-    trainset_size, testset_size, fold_number = map(int, sys.argv[1:4])
-    dataset_shuffle_filename = sys.argv[4]
 
-    with open(dataset_shuffle_filename) as dataset_shuffle_in:
-        dataset_shuffle = map(
-            int,
-            dataset_shuffle_in.readline().strip().split(' ')
-        )
-    accuracies = main(
-        trainset_size,
-        testset_size,
-        fold_number,
-        dataset_shuffle
-    )
+    accuracies = main()
     print ('train: {0:.3f}, test: {1:.3f}'.format(*accuracies))
