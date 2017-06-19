@@ -4,9 +4,11 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 import random
+from argparse import ArgumentParser
 from itertools import chain
 from six.moves import range, reduce
 import logging
+import sys
 
 from sklearn import metrics
 import tensorflow as tf
@@ -23,6 +25,29 @@ from memn2n import MemN2N
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
 logger = logging.getLogger(__file__)
 
+
+def configure_argument_parser():
+    parser = ArgumentParser(description='train MemN2N on bAbI/bAbI+ dialogs')
+    parser.add_argument('train_dialogs', help='train dialogs root')
+    parser.add_argument('test_dialogs', help='test dialogs root')
+    parser.add_argument(
+        '--predict_last_turn_only',
+        type=bool,
+        default=False,
+        help='whether to only test on the last (API) turns'
+    )
+    parser.add_argument(
+        '--ignore_api_calls',
+        type=bool,
+        default=False,
+        help='whether to ignore API calls while loading data'
+    )
+
+    return parser
+
+parser = configure_argument_parser()
+args = parser.parse_args()
+
 tf.flags.DEFINE_float(
     "learning_rate",
     0.01,
@@ -37,7 +62,7 @@ tf.flags.DEFINE_integer(
 )
 tf.flags.DEFINE_integer("batch_size", 8, "Batch size for training.")
 tf.flags.DEFINE_integer("hops", 1, "Number of hops in the Memory Network.")
-tf.flags.DEFINE_integer("epochs", 3, "Number of epochs to train for.")
+tf.flags.DEFINE_integer("epochs", 100, "Number of epochs to train for.")
 tf.flags.DEFINE_integer(
     "embedding_size",
     128,
@@ -48,12 +73,12 @@ tf.flags.DEFINE_integer("task_id", 1, "bAbI task id, 1 <= id <= 6")
 tf.flags.DEFINE_integer("random_state", 273, "Random state.")
 tf.flags.DEFINE_string(
     "data_dir",
-    "../babi_tools/babi_plus/",
+    args.train_dialogs,
     "Directory containing bAbI tasks"
 )
 tf.flags.DEFINE_string(
     "data_dir_plus",
-    "../babi_tools/babi_plus/",
+    args.test_dialogs,
     "Directory containing bAbI+ tasks"
 )
 FLAGS = tf.flags.FLAGS
@@ -64,8 +89,16 @@ np.random.seed(FLAGS.random_state)
 print("Started Task:", FLAGS.task_id)
 
 # task data
-train_babi, dev_babi, test_babi, test_oov_babi = load_task(FLAGS.data_dir, FLAGS.task_id)
-train_plus, dev_plus, test_plus, test_oov_plus = load_task(FLAGS.data_dir_plus, FLAGS.task_id)
+train_babi, dev_babi, test_babi, test_oov_babi = load_task(
+    FLAGS.data_dir,
+    FLAGS.task_id,
+    args.ignore_api_calls
+)
+train_plus, dev_plus, test_plus, test_oov_plus = load_task(
+    FLAGS.data_dir_plus,
+    FLAGS.task_id,
+    args.ignore_api_calls
+)
 
 all_dialogues_babi = train_babi + dev_babi + test_babi + test_oov_babi
 all_dialogues_babi_plus = train_plus + dev_plus + test_plus + test_oov_plus
@@ -161,9 +194,13 @@ def train_model(in_model, in_train_sqa, in_train_eval_sqa, in_test_sqa, in_batch
 
 def main():
     dialogues_train = map(lambda x: x, train_babi)
-    dialogues_train_eval = map(lambda x: [x[-1]], train_babi)
-    # testing only on API calls?
-    dialogues_test = map(lambda x: [x[-1]], test_plus)
+    dialogues_train_eval = map(lambda x: [x[-1]], train_babi) \
+        if args.predict_last_turn_only \
+        else map(lambda x: x, train_babi)
+
+    dialogues_test = map(lambda x: [x[-1]], test_plus) \
+        if args.predict_last_turn_only \
+        else map(lambda x: x, test_plus)
 
     data_train = reduce(lambda x, y: x + y, dialogues_train, [])
     data_train_eval = reduce(lambda x, y: x + y, dialogues_train_eval, [])
@@ -235,6 +272,5 @@ def main():
 
 
 if __name__ == '__main__':
-
     accuracies = main()
     print ('train: {0:.3f}, test: {1:.3f}'.format(*accuracies))

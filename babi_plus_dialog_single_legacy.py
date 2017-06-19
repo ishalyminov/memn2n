@@ -7,7 +7,6 @@ import random
 from itertools import chain
 from six.moves import range, reduce
 import logging
-import sys
 
 from sklearn import metrics
 import tensorflow as tf
@@ -38,7 +37,7 @@ tf.flags.DEFINE_integer(
 )
 tf.flags.DEFINE_integer("batch_size", 8, "Batch size for training.")
 tf.flags.DEFINE_integer("hops", 1, "Number of hops in the Memory Network.")
-tf.flags.DEFINE_integer("epochs", 100, "Number of epochs to train for.")
+tf.flags.DEFINE_integer("epochs", 3, "Number of epochs to train for.")
 tf.flags.DEFINE_integer(
     "embedding_size",
     128,
@@ -49,12 +48,12 @@ tf.flags.DEFINE_integer("task_id", 1, "bAbI task id, 1 <= id <= 6")
 tf.flags.DEFINE_integer("random_state", 273, "Random state.")
 tf.flags.DEFINE_string(
     "data_dir",
-    sys.argv[1],
+    "../babi_tools/babi_plus/",
     "Directory containing bAbI tasks"
 )
 tf.flags.DEFINE_string(
     "data_dir_plus",
-    sys.argv[2],
+    "../babi_tools/babi_plus/",
     "Directory containing bAbI+ tasks"
 )
 FLAGS = tf.flags.FLAGS

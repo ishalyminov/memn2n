@@ -18,7 +18,7 @@ def get_dialogs(f, ignore_api_calls):
         return parse_dialogs(f.readlines(), ignore_api_calls=ignore_api_calls)
 
 
-def load_task(data_dir, task_id, only_supporting=False):
+def load_task(data_dir, task_id, ignore_api_calls):
     '''Load the nth task. There are 6 tasks in total.
 
     Returns a tuple containing the training and testing data for the task.
@@ -32,10 +32,10 @@ def load_task(data_dir, task_id, only_supporting=False):
     dev_file = filter(lambda file: s in file and 'dev.txt' in file, files)[0]
     test_file = filter(lambda file: s in file and 'tst.txt' in file, files)[0]
     oov_file = filter(lambda file: s in file and 'OOV.txt' in file, files)[0]
-    train_data = get_dialogs(train_file, False)
-    dev_data = get_dialogs(dev_file, False)
-    test_data = get_dialogs(test_file, False)
-    oov_data = get_dialogs(oov_file, False)
+    train_data = get_dialogs(train_file, ignore_api_calls)
+    dev_data = get_dialogs(dev_file, ignore_api_calls)
+    test_data = get_dialogs(test_file, ignore_api_calls)
+    oov_data = get_dialogs(oov_file, ignore_api_calls)
     return train_data, dev_data, test_data, oov_data
 
 
