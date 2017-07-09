@@ -1,0 +1,13 @@
+{
+  "learning_rate": 0.01,
+  "epsilon": 1e-8,
+  "max_grad_norm": 40.0,
+  "evaluation_interval": 1,
+  "batch_size": 8,
+  "hops": 1,
+  "epochs": 100,
+  "embedding_size": 128,
+  "memory_size": 64,
+  "task_id": 1,
+  "random_state": 273
+}

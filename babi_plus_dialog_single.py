@@ -20,6 +20,7 @@ from dialog_data_utils import (
     load_task,
     vectorize_answers
 )
+from tf_config import configure
 from memn2n import MemN2N
 
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
@@ -42,35 +43,23 @@ def configure_argument_parser():
         default=False,
         help='whether to ignore API calls while loading data'
     )
+    parser.add_argument(
+        '--config',
+        type=str,
+        default='babi_plus_dialog_single.json',
+        help='MemN2N config'
+    )
 
     return parser
 
 parser = configure_argument_parser()
 args = parser.parse_args()
 
-tf.flags.DEFINE_float(
-    "learning_rate",
-    0.01,
-    "Learning rate for Adam Optimizer."
-)
-tf.flags.DEFINE_float("epsilon", 1e-8, "Epsilon value for Adam Optimizer.")
-tf.flags.DEFINE_float("max_grad_norm", 40.0, "Clip gradients to this norm.")
-tf.flags.DEFINE_integer(
-    "evaluation_interval",
-    1,
-    "Evaluate and print results every x epochs"
-)
-tf.flags.DEFINE_integer("batch_size", 8, "Batch size for training.")
-tf.flags.DEFINE_integer("hops", 1, "Number of hops in the Memory Network.")
-tf.flags.DEFINE_integer("epochs", 100, "Number of epochs to train for.")
-tf.flags.DEFINE_integer(
-    "embedding_size",
-    128,
-    "Embedding size for embedding matrices."
-)
-tf.flags.DEFINE_integer("memory_size", 64, "Maximum size of memory.")
-tf.flags.DEFINE_integer("task_id", 1, "bAbI task id, 1 <= id <= 6")
-tf.flags.DEFINE_integer("random_state", 273, "Random state.")
+CONFIG_FILE = path.join(path.dirname(__file__), args.config)
+with open(CONFIG_FILE) as config_in:
+    CONFIG = json.load(config_in)
+
+configure(CONFIG)
 tf.flags.DEFINE_string(
     "data_dir",
     args.train_dialogs,
