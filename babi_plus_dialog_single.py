@@ -33,14 +33,14 @@ def configure_argument_parser():
     parser.add_argument('test_dialogs', help='test dialogs root')
     parser.add_argument(
         '--predict_last_turn_only',
-        type=bool,
         default=False,
+        action='store_true',
         help='whether to only test on the last (API) turns'
     )
     parser.add_argument(
         '--ignore_api_calls',
-        type=bool,
         default=False,
+        action='store_true',
         help='whether to ignore API calls while loading data'
     )
     parser.add_argument(
