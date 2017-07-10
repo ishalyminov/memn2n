@@ -61,6 +61,12 @@ CONFIG_FILE = path.join(path.dirname(__file__), args.config)
 with open(CONFIG_FILE) as config_in:
     CONFIG = json.load(config_in)
 
+print(json.dumps(
+    CONFIG,
+    sort_keys=True,
+    indent=4,
+    separators=(',', ': ')
+))
 configure(CONFIG)
 tf.flags.DEFINE_string(
     "data_dir",
@@ -94,11 +100,15 @@ train_plus, dev_plus, test_plus, test_oov_plus = load_task(
 all_dialogues_babi = train_babi + dev_babi + test_babi + test_oov_babi
 all_dialogues_babi_plus = train_plus + dev_plus + test_plus + test_oov_plus
 
-data = reduce(
-    lambda x, y: x + y,
-    all_dialogues_babi + all_dialogues_babi_plus,
-    []
-)
+data = []
+for dialogue in all_dialogues_babi + all_dialogues_babi_plus:
+    data += dialogue
+
+# data = reduce(
+#     lambda x, y: x + y,
+#     all_dialogues_babi + all_dialogues_babi_plus,
+#     []
+# )
 max_story_size = max(map(len, (s for s, _, _ in data)))
 mean_story_size = int(np.mean([len(s) for s, _, _ in data]))
 sentence_size = max(map(len, chain.from_iterable(s for s, _, _ in data))) + 2
