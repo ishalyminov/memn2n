@@ -60,13 +60,6 @@ args = parser.parse_args()
 CONFIG_FILE = path.join(path.dirname(__file__), args.config)
 with open(CONFIG_FILE) as config_in:
     CONFIG = json.load(config_in)
-
-print(json.dumps(
-    CONFIG,
-    sort_keys=True,
-    indent=4,
-    separators=(',', ': ')
-))
 configure(CONFIG)
 tf.flags.DEFINE_string(
     "data_dir",
@@ -79,6 +72,10 @@ tf.flags.DEFINE_string(
     "Directory containing bAbI+ tasks"
 )
 FLAGS = tf.flags.FLAGS
+print('{}:\t{}'.format('data_dir', FLAGS.data_dir))
+print('{}:\t{}'.format('data_dir_plus', FLAGS.data_dir_plus))
+for key, value in CONFIG.iteritems():
+    print('{}:\t{}'.format(key, value))
 
 random.seed(FLAGS.random_state)
 np.random.seed(FLAGS.random_state)
@@ -169,7 +166,12 @@ def train_model(in_model, in_train_sqa, in_train_eval_sqa, in_test_sqa, in_batch
 
         if t % FLAGS.evaluation_interval == 0:
             # evaluate on the whole trainset
-            train_preds = in_model.predict(s_train_eval, q_train_eval)
+            eval_batch_size = 100
+            train_preds = np.zeros(shape=train_eval_labels.shape, dtype=np.int32) 
+            for batch_start in xrange(0, len(s_train_eval), eval_batch_size):
+                batch_end = (batch_start + eval_batch_size) % (len(s_train_eval) + 1)
+                preds = in_model.predict(s_train_eval[batch_start:batch_end], q_train_eval[batch_start:batch_end])
+                train_preds[batch_start:batch_end] = preds
             train_acc = metrics.accuracy_score(
                 train_preds,
                 train_eval_labels
